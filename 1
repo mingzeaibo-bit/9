@@ -1,640 +1,1772 @@
-2026-10-16, tfa-bonecloth-builder. Sources: the annotated decompile corpus `../data/decompiled/all/` (Ghidra 12.1.4 pass
-documented in `13-game-systems.md`; REA/Ghidra were held by the researcher agent, so this pass cites corpus files),
-`../data/il2cpp/types.cs` (field offsets), and shipped bundles read with UnityPy (read-only). Labels: **[obs]** read in
-the cited file or measured in shipped data, **[inf]** inferred. Tools: `../scripts/own_bonecloth.py` (builder, validator,
-shipped regeneration, profile extraction, assembler hook), `../scripts/own_cloth_colliders.py` (collider skin fit, rest
-clearance), `../scripts/proof_bonecloth.py` (proof sheet). Data: `<SHIPPED_LIB_DIR>/_bonecloth/bonecloth_param_profiles.json` (local only, game content;
-ClothParams sets).
-
-**Headline proof:** the builder is a port of the game's own editor-side generator; `own_bonecloth.py --verify-shipped`
-regenerates **74 of 74** shipped `ConnectionMode.Line` bone cloths of 28 characters (1 629 particles) from their own
-transforms + SelectionData + ClothParams, and every list (transform order, MeshData lines, useVertexList, selection,
-flags, levels, depths, parent/root lists, struct, root distance, restore rotation, clamp rotation, line rotation,
-initScale) is identical 鈥?integers exactly, floats within float32 noise (max |螖| 6e-7 m lengths, 3e-6 line-rotation,
-1.9e-5 clamp-rotation unit vectors). Report: `<WORK_DIR>/proof/bonecloth/shipped_regen.json`. Not ported (not needed):
-`ConnectionMode.Mesh` (16 shipped cloths) and bend/near-distance/triangle-bend lists (2 shipped line cloths).
-
----
-
-## 1. Where bone cloths live and which game code touches them **[obs]**
-* `<root>/Cloths/B_<name>`: GameObject with one `MagicaBoneCloth` (+ its own data objects `BoneClothMeshData_<name>`,
-  `BoneClothData_<name>`, `SelectionData_<name>`). Shipped examples: tifa B_Hair/B_HairB/B_HairC/B_Earrings/B_Belts/
-  B_Skirt/B_Suspenders; tifa lifeguard B_HairFront/B_HairFront1/B_HairBack/B_HairPonytail/B_Clothing/B_Bikini;
-  bayonetta B_Sleeves/B_SleevesBack/B_Gun/B_Clothes; yennefer B_HairMedium{Front,Back,B}.
-* `<root>/ClothTemplates/B_*` (inactive): editor presets with **empty `rootList`** (168 of the scanned components). No game
-  code references "ClothTemplates" (string not in the corpus); optional.
-* **`Girl.m_clothingCloths` (0x128)** = the cloth components that belong to the outfit (tifa: B_Skirt, B_Belts,
-  B_Suspenders; lifeguard: B_Clothing, B_Bikini; asuna: the V_/M_ mesh-cloth skirt/collar; hair is never listed).
-  `Game.CreateHumanWithClothing` (`Game__CreateHumanWithClothing.c` l.1090-1330): (1) `DestroyImmediate` the
-  GameObjects of the **body** character's `m_clothingCloths`; (2) re-parent the **clothing** character's components under
-  the body's `Cloths` (local pose reset to identity); (3) every entry of their `teamData.colliderList` is replaced by
-  the body's `ClothColliders` component **of the same name** (`b__6` predicate), else logged `"Cloth collider not
-  found: <name>"`; (4) `Rig.TransferBones` grafts the clothing armature onto the body bones. 鈬?keep the standard
-  `ClothColliders` names; list only garment cloths.
-* `Girl.GenerateRagdollSkins` (`Girl__GenerateRagdollSkins.c` l.400-490, `Girl___c___GenerateRagdollSkins_b__212_0.c`):
-  every MagicaBoneCloth under the girl (`GetComponentsInChildren(true)`) except names `B_Breasts`/`B_Ass` adds its
-  `clothTarget.rootList` to the ragdoll-bone list 鈫?`Utils.CollectBones` gives each cloth root its own skin part
-  (`<root>_RD`). Automatic; roots must be valid transforms.
-* `BaseCloth.UpdateCullingMode` (`MagicaCloth_BaseCloth__UpdateCullingMode.c`): for a MagicaBoneCloth with an **empty
-  `cullRendererList`** the `cullingMode` is forced to 100 (Off) at runtime. `TeamCullingMode`: Reset 0, Pause 10, Off 100.
-* `FaceRig`: every descendant of `Rig.head` is a "face bone" (13 搂3.3), but `FaceRig.UpdateFaceBones` writes only
-  `m_bonesCache` = bones that carry a Face_Pose delta (`FaceRig__UpdateFaceBones.c` l.300-400, `FaceRig__Init.c`
-  l.2281-2385) 鈬?hair bones under the head are safe **as long as Face_Pose does not animate them**.
-* `Rig.m_transfromWrapList` (TransformWrap: re-parents a bone's children to its parent and drives the bone from body
-  skin weights every frame, `Rig_TransformWrap__Awake.c`, `Rig__UpdateTransformWraps.c`) is a separate feature; not
-  needed for bone cloth.
-
-## 2. Runtime contract **[obs]**
-### 2.1 Init
-`CoreComponent.Init` 鈫?`BaseCloth.OnInit` 鈫?`MagicaBoneCloth.ClothInit` (`MagicaCloth_MagicaBoneCloth__ClothInit.c`):
-`clothTarget.AddParentTransform()` (registers the *parents* of the roots as read-only bones,
-`MagicaCloth_BoneClothTarget__AddParentTransform.c`), then `ClothSetup.ClothInit(team, meshData, clothData,
-clothParams, UserFlag)` (`MagicaCloth_ClothSetup__ClothInit.c`). **The `meshData` argument is never referenced** (no
-`<decompiled expression omitted>` use) 鈬?the bone-cloth MeshData is an editor container; the game runs on ClothData + the component lists.
-### 2.2 Particles and transforms
-* Particle `i` 鈬?`ClothData.useVertexList[i]` = index into `useTransformList`. `CreateParticle` gets flag / depth /
-  radius lambdas (`鈥lothSetup___c__DisplayClass2_0___ClothInit_b__0/1/2.c`): flag = `UserFlag(i)` | (selection 2 or 3 鈫?  Kinematic 0x2 | Step_Update 0x1000000) | (`vertexFlagLevelList[i] & 0x20000` 鈫?TriangleRotation 0x400) |
-  Reset_Position 0x2000000; depth = `vertexDepthList[i]`; radius = `clothParams.radius.Evaluate(depth)`.
-* `MagicaBoneCloth.UserFlag(i)` (`鈥_UserFlag.c`): `0x4000 Read_Base | 0x20000 Write | 0x100000 Parent` + `0x40000
-  Restore` unless `clothTarget.skipRestore` (0x1C) + `0x3000 Read_Pos|Read_Rot` when `selectionData[i] == 2` (Extend is
-  *not* treated as fixed here).
-* `EnableTeamParticle` 鈫?`MagicaPhysicsManager.SetEnable` (`鈥_SetEnable.c`): `AddBone(UserTransform(i))` with
-  `UserTransform(i) = useTransformList[useVertexList[i]]`; `AddRestoreBone(transform, useTransformPositionList[uv[i]],
-  useTransformRotationList[uv[i]])`. `useTransformScaleList` has **no reader**.
-* Restore (before animation): local pos/rot 鈫?the stored lists. Read (after animation): base pose (all), pos/rot
-  (Fixed). Write (`鈥WriteBoneToTransformJob2__Execute.c`): bones whose parent is a registered bone get
-  `SetLocalPositionAndRotation` relative to the parent's *new* pose, others `SetPositionAndRotation` 鈬?every particle's
-  transform ends exactly at its particle pose; a rotating parent does **not** drag a fixed child.
-* `LineWorker.LineRotationJob` (`MagicaCloth_LineWorker_LineRotationJob__Execute.c` l.388): rotates each particle with
-  children toward them; Fixed particles are skipped **only if** the team flag 0x4 FixedNonRotation is set
-  (`ClothParams.useFixedNonRotation` 0x1D9, `ClothSetup.ClothInit` tail). 鈬?a Fixed root rotates by default; a leaf
-  keeps its rest rotation relative to its parent 鈬?**chains need a tip particle** for the last bone to bend (shipped:
-  `*_end` / `*_Phy_end` transforms, e.g. tifa B_Skirt `C_SkirtA_c_Phy_end`).
-### 2.3 Constraints created by this fork's `ClothSetup.ClothInit`
-Spring (`useSpring`), ClampPosition (`useClampPositionLength`), ClampDistance (`useClampDistanceRatio` + rootDistance
-lists), RestoreDistance (struct/bend/near lists, any non-empty), RestoreRotation (`useRestoreRotation` + list),
-ClampRotation (`useClampRotation` + lists), TriangleBend, collision team flags (`useCollision` 0x20, `isThroat`),
-Penetration (`usePenetration` + list), LineWorker (lineRotation lists, `useLineAvarageRotation`), TriangleWorker
-(triangleRotation lists), FixedNonRotation. **Not created:** clampDistance2, volume, adjustRotation, edgeCollision.
-### 2.4 Hashes / versions
-None is read at runtime (13 搂1.0). Shipped values: `dataVersion 6`, `clothDataVersion 5`, `clothSelectionVersion 2`,
-`meshDataVersion 2`, hashes arbitrary ints, `clothParamDataHashList` 21 ints (read only by `HasChangedParam`, no
-caller). Writing 0 hashes is safe (our M_* mesh cloths already run with 0).
-
-## 3. Component fields (`MagicaBoneCloth`, types.cs 28640) **[obs: types.cs + shipped]**
-| Field | Shipped / rule |
-|---|---|
-| `teamData.colliderList` | PPtr to the **collider components** (`MagicaCapsuleCollider`/`MagicaSphereCollider`) under `ClothColliders`; 2-24 per cloth |
-| `teamData.penetrationIgnoreColliderList`, `mergeAvatarCollider` | `[]`, 1 |
-| `userBlendWeight`, `cullingMode`, `cullRendererList` | 1.0; 0 or 100; `[]` (鈬?Off) |
-| `clothParams` | 84 fields (section 5) |
-| `clothData`, `clothSelection`, `meshData` | PPtr to the three data objects |
-| `clothTarget.rootList` / `rootNameList` | PPtr<Transform> of the chain roots / the same names (no runtime reader for the names) |
-| `clothTarget.connection` | 0 Line, 1 Mesh (`ConnectionMode`) |
-| `clothTarget.skipRestore` | 0 hair (restore every frame), 1 most garments |
-| `clothTarget.isSkirt`, `nonLoopMesh`, `sameSurfaceAngle` | editor mesh-builder options, no runtime reader |
-| `useTransformList` | PPtr<Transform>[n] in `GetTransformList` order (4.1) |
-| `useTransformPositionList` / `RotationList` / `ScaleList` | `localPosition` / `localRotation` / `localScale` of each transform at creation (0.0 error vs the prefab in 74 cloths) |
-
-## 4. Data objects for `ConnectionMode.Line` 鈥?exact encoding **[obs: regenerated 74/74]**
-### 4.1 Order (`MagicaBoneCloth.GetTransformList`, `鈥_GetTransformList.c`)
-For each root in `rootList`: `root.GetComponentsInChildren<Transform>()` (DFS pre-order, sibling order, root first)
-into a HashSet (insertion order); `rootIdDict.Add` throws on a transform reached twice 鈬?**roots must not nest**.
-Editor inputs (`鈥_GetEditorPositionNormalTangent.c`): world position, `nor = TransformDirection(forward)`,
-`tan = TransformDirection(up)`; rotation used by every builder below = `Quaternion.LookRotation(nor, tan)`.
-### 4.2 `MeshData` "BoneClothMeshData_<name>"
-`isSkinning 0`, `baseScale (0,0,0)`, `vertexCount n`, `boneWeightInfoList[i] = 1<<28 | i` with an **empty**
-`vertexBoneWeightList`, `lineList` = one `(parentIndex, index)` pair per transform whose parent is in the list (list
-order), `lineCount = len/2`; triangles only for Mesh connection; all other lists empty.
-### 4.3 `SelectionData` "SelectionData_<name>"
-`selectionList[0] = {selectData[n] (0 invalid, 1 Move, 2 Fixed, 3 Extend), vertexPosList[n]}` with positions
-relative to the character root (8.6e-7 m max deviation). Editor-only.
-### 4.4 `ClothData` "BoneClothData_<name>" (`MagicaCloth_ClothData__CreateData/CreateVertexData/CreateConstraintData.c`)
-* `useVertexList = [v | sel[v] != 0]`, `selectionData` parallel (per particle).
-* **Levels** (`CreateVertexData`): Fixed = 1; sweep pass L = 1, 2, 鈥? every not-yet-leveled vertex (ascending) with a
-  linked neighbour of level L gets L+1; stop after a pass without change; `maxLevel` = L of that pass. Invalid/Extend
-  excluded. Links = `MeshUtility.GetTriangleToVertexLinkList` over `lineList` (HashSet per vertex, insertion order).
-* **Depth** = clamp01((level鈭?)/(maxLevel鈭?)) in float32 (all 0 鈫?all 1.0); `vertexFlagLevelList = level |
-  0x10000 (End: no particle has it as parent, not Extend) | 0x20000 (triangle vertex, Mesh only)`.
-* **parentList** (`GetUseParentVertexList`, `鈥__c__DisplayClass91_0___GetUseParentVertexList_b__0.c`): Fixed 鈫?鈭?;
-  Move particles processed deepest first (ties: farther from the nearest Fixed first); parent = linked neighbour with
-  depth 鈮?own depth, not creating a cycle, maximising `dot(normalize(p_n 鈭?p), normalize(nearestFixed 鈭?p))` 鈬?the
-  hierarchy parent for chains. **rootList** = top of the parent chain (鈭? for the top itself).
-* **struct** (`structDistanceDataList/ReferenceList`): per particle in order, per linked neighbour in link order,
-  skipping Fixed鈥揊ixed (and Extend): `{vertexIndex, targetVertexIndex, length = world distance}`; both directions.
-* **root clamp distance** (if `useClampDistanceRatio`): Move particles with `rootList >= 0`: `{i, root, distance}`.
-* **restore rotation** (if `useRestoreRotation`): Move (non-Extend) particles with a parent:
-  `{i, parent, localPos = inverse(rot_parent) * (p_i 鈭?p_parent)}`.
-* **clamp rotation** (if `useClampRotation`): lines = `GetUseRootLineList` (for every root with children, for every
-  child: `[root] + BFS(child subtree)`); lines of length > 1 鈫?`rootInfo {startIndex, dataLength}`; entries
-  `{vertexIndex, parentVertexIndex, localPos, localRot}`: root = `{i, 鈭?, 0, (0,0,0,0)}`, others
-  `localPos = inverse(rot_p) * normalize(p_i 鈭?p_p)`, `localRot = inverse(rot_p) * rot_i`.
-* **line rotation** (always when `lineList` is non-empty; `CreateConstraintData` l.2169-2440): for each vertex in
-  `lineList` order that is a parent-tree root: BFS block; entry `{vertexIndex, childCount, childStartDataIndex,
-  localPos, localRot}` with `localPos/localRot` relative to the parent (root: 0 / identity) and **child slots allocated
-  in BFS order** (`childStartDataIndex = running slot + 1`, children contiguous); blocks with < 2 entries or made only
-  of triangle vertices are dropped; `rootInfo {startIndex, dataLength}` (ushort).
-* **Reference packing** (`ReferenceDataBuilder.GetDirectReferenceData`): `{startIndex, count}` per particle, data =
-  concatenation in particle order; **when the data list is empty both arrays stay empty** (Tracer B_Collar).
-* `initScale` = `lossyScale` of the cloth's transform (or `influenceTarget`): 1 for us; scaled roots ship e.g. 0.75
-  (Malenia), 1.1 (Bayonetta). `penetrationMode` copied only when `usePenetration`.
-* ClothData element layouts (as written by `tfa_writer`): `RestoreDistanceData/ClampDistanceData {vertexIndex,
-  targetVertexIndex, length}`, `RotationData {vertexIndex, targetVertexIndex, localPos{x,y,z}}`, `ClampRotationData /
-  LineRotationData 鈥?localRot {"value": {x,y,z,w}}` (Unity.Mathematics.quaternion), `ReferenceDataIndex {startIndex,
-  count}`, root infos `{startIndex, dataLength}`.
-
-## 5. Parameters (the game's own sets; local copy `<SHIPPED_LIB_DIR>/_bonecloth/bonecloth_param_profiles.json`, game content, not in the toolset)
-| Shipped cloth | n / fixed | gravity | drag | maxVel | restoreRot | radius | notes |
-|---|---|---|---|---|---|---|---|
-| tifa B_Hair | 43 / 10 | 鈭?0 | 0.036 | 0.12 | 0.355鈫?.102 | 0.013鈫?.018 | hair, skipRestore 0, FixedNonRotation 0 |
-| lifeguard B_HairFront | 24 / 6 | 鈭?.9鈫掆垝9.27 | 0.10 | 1.25鈫?.31 | 0.336鈫?.083 | 0.020鈫?.011 | long front strands |
-| lifeguard B_HairBack | 8 / 1 | 鈭?0 | 0.10 | 1.21 | 0.222鈫?.113 | 0.021鈫?.013 | back hair |
-| yennefer B_HairMediumBack | 19 / 7 | 鈭?0 | 0.10 | 0.20 | 0.06鈫? | 0.016鈫?.021 | + clampRotation 17掳鈫?2掳 |
-| lifeguard B_Clothing | 7 / 4 | 鈭?.32鈫掆垝7.24 | 0.055 | 0.45 | 0.186鈫?.148 | 0.018鈫?.021 | garment flaps, skipRestore 1 |
-| tifa B_Skirt | 50 / 20 | 鈭?0 | 0.019 | 0.23 | off | 0.014 | 10 independent chains, `*_Phy_end` tips |
-| bayonetta B_Sleeves | 36 / 6 | 鈭?0 | 0.036 | 0.60 | 0.17鈫?.067 | 0.018鈫?.042 | sleeve cloth |
-| bayonetta B_Gun | 6 / 2 | 鈭?0 | 0.046 | 0.27 | 0.164鈫?.053 | 0.008鈫?.006 | holstered gun |
-Common: `worldMoveInfluence 0.971`, `worldRotationInfluence 1`, `useClampDistanceRatio 1 (0鈥? or 0鈥?)`, `useCollision 1`.
-`skipRestore 1` means no rest restore before animation: for **unanimated** bones the base pose becomes last frame's
-result and restore rotation loses its target 鈥?use `skipRestore 0` when the cloth bones carry no animation **[inf]**.
-
-## 6. Cloth colliders (`ClothColliders`)
-* Runtime (`13 搂5.1 step 8`): every `Rig@ClothColliders` slot transform is re-parented under `m_rig[name].rotateTF`
-  keeping its world pose (spine4 under spine3, ass slots under `Thigh.X`), then `ClothColliders` is deactivated 鈬?every
-  collider must be a slot or a child of one; authored centre offsets/rotations survive.
-* Shipped sizes (tifa/lifeguard/yennefer): torso capsules **across** the body (axis X): spine/spine2 r 0.109 (len 0.04),
-  spine3 r 0.122, spine4 r 0.078-0.097, pelvis r 0.111 (len 0.08); head r 0.085-0.102 鈫?0.065; neck 0.057-0.06; thighs
-  0.094 鈫?0.059 (center 0.219, len 0.24 = **inset by ~r**), calves 0.062 鈫?0.046, upper arms 0.062 鈫?0.053, forearms
-  0.05 鈫?0.031, hands/feet 0.05 鈫?0.044, breasts 0.069 鈫?0.057, ass spheres 0.068-0.115.
-* the case-study model's current assembler capsules (`assemble_own.py` `radius_near`) use the body's `RADIUS` attribute (a per-vertex
-  thickness, median 15 mm), not the skin distance to the bone: pelvis 14 mm, ass spheres 30 mm, torso along the spine.
-  Garments and hair cannot rest on them. **Proposal** (`own_cloth_colliders.py`, `<WORK_DIR>/own/bonecloth/
-  collider_proposal.json`): radius = p85 of her skin's distance to the capsule axis; limbs inset by the radii like
-  shipped; torso slabs across the body (pelvis r 0.083 len 0.144, spine 0.084/0.109, spine2 0.068/0.068, spine3
-  0.080/0.055, spine4 0.073/0.093); head r 0.063 (her skull is 13.8 cm wide); thighs 0.095 鈫?0.075, calves 0.078 鈫?0.037,
-  upper arms 0.058 鈫?0.038, forearms 0.038 鈫?0.024, hands 0.030 鈫?0.034, feet 0.044 鈫?0.037 on a new heel-to-toe frame,
-  ass spheres = least-squares sphere through the `Ass` region (r 0.094, centre 3.9 cm behind the hip pivot).
-* Rest clearance (particle surface to collider surface, own cloths, proposal): worst 鈭? mm (back jacket panel tips vs
-  ass spheres), 鈭?.4 mm (front cuff tips vs forearms), 鈭?.3 mm (one side strand vs head); all others +2.5 鈥?+32 mm
-  (`<WORK_DIR>/proof/bonecloth/rest_clearance.json`).
-
-## 7. the case-study model bone cloths (2026-10-16)
-Plan `<WORK_DIR>/own/bonecloth/plan.json` (grouping = the model's own Blender cloth proxies `Shion_Phy-Hair_Front`,
-`-Hair_Front_Long`, `-Hair_Back`, `-Jacket_Cloth` and the physics bone collections "Default Equipment Pants Cloth" /
-"Thigh Harness Weapon"), built `B_*.json` next to it, integration `INTEGRATION.md`:
-| Cloth | Roots (bones) | Transforms (fixed/move/tips) | Profile | Garment |
-|---|---|---|---|---|
-| B_HairLong | Front_Strand_1.L/.R (6 bones each) | 14 (2/12/2) | lifeguard B_HairFront | no |
-| B_HairFront | bangs Front_M/L/R, Side_Strand_1(+2), Side_Root.L/.R, Side_Strand_1.L/.R(+2) | 19 (8/11/8) | tifa B_Hair | no |
-| B_HairBack | Back_01, BackSide_01.L/.R (6 each) | 21 (3/18/3) | lifeguard B_HairBack | no |
-| B_Jacket | Jacket_Cloth_1..4.L/.R (8 hanging panels, all Fixed + own tips) | 16 (8/8/8) | lifeguard B_Clothing | yes |
-| B_Sleeves | Jacket_Sleeves_Front/Back1/Back2.L/.R | 12 (6/6/6) | bayonetta B_Sleeves | yes |
-| B_Pants | Pants_Lower_Front/Back.L/.R | 8 (4/4/4) | lifeguard B_Clothing | yes |
-| B_Harness | Thigh_Harness_Weapon.L/.R (33 cm weapon) | 4 (2/2/2) | bayonetta B_Gun | yes |
-Model-derived overrides: radius from each chain's skinned geometry (`strand_radii.json`; hair 6-25 mm, sheets 8-10 mm,
-weapon 30-35 mm), `useFixedNonRotation 0`, `skipRestore 0`. Straps/belts/garter belt are skinned to body bones only
-(no chain exists); `CollarBone`/`BackCollar` are rig stretch bones, not physics. Proof: all validation rules pass;
-writer round trip + end-to-end hook test (`integration_test.json`: lists equal the written transforms, ClothData
-regenerated from the written bundle equals the stored one); in-game proof pending (tester).
-
-## 8. Hair that acts like hair: lock cutting (2026-10-18, AUTO tools + AI config)
-**Diagnosis rule.** A hair mesh hung on a few chains with blocky weights moves as one block. the case-study model's main sheet had
-1 108 vertices on 3 chains of 6 bones, with 39 % of the hair vertices rigid to one bone, and its UV-split layers tore
-5.6x in a bend test. To check a new model, look at chains per hanging sheet, the rigid share and the median max weight.
-**How the developer did it** **[obs: 18 creator source models vs shipped]**
-* The creators' FBX already contain dense hair chains (Queen 52 hair bones, Asuna 5 back chains x 8, Primrose 67), with
-  no `_end` leaves. The developer used them unchanged as cloth roots.
-* Shipped survey, 24 characters (`scripts/tfa_bonecloth_survey.py` -> `<SHIPPED_LIB_DIR>/_bonecloth_survey/`, local):
-  * long back hair: 3-12 chains x 8-12 bones, mostly mesh connection (asuna, irelia, power, marin, succubus,
-    tifa B_HairC);
-  * smooth weights: median max weight 0.45-0.65, rigid share about 0;
-  * front and side hair: line chains of 2-6 bones.
-**Parameter facts** **[obs: profiles + decomp]**
-* 41 of the 44 shipped hair cloths leave `useClampRotation` off. queen B_HairFront and B_HairL are the standard
-  front-hair preset (restoreRotation 0.213 -> 0.051, as on power, marin and artoria B_SideBang) plus
-  `useClampRotation 1` at 0 deg, a position clamp and triangle bend.
-* `ClampRotationJob` (decomp `MagicaCloth_ClampRotationConstraint_ClampRotationJob__Execute`) clamps each non-fixed
-  child's direction to within `CurveParam(depth)` deg of `parentRot * localPos`, so 0 deg makes the locks rigid. Never
-  copy that switch for hair that should move.
-* Most front hair has `useFixedNonRotation 0` (31 of 44).
-**Cutter** `scripts/own_hair_locks.py <cfg>` (cfg = AI work; example `<WORK_DIR>/own/bonecloth/hair_locks_cfg.json`):
-* Regions are chosen by the largest component or a dominant-bone regex. Split modes:
-  * `fan`: angle around the apex fitted from the sheet's edge lines, with one global normalization. Use it for a sheet
-    whose bottom ends in tongues; `lateral` (x divided by local half-width) sent V-bottom tips to non-adjacent locks
-    and tore them 16x.
-  * `lateral`, `per_component`, `single`.
-* Weights are computed per welded position (no seam cracks):
-  * the creator's head weight is kept;
-  * the remainder goes onto the lock chain with a triangle kernel (`spread` 1.5 bones), using the vertex's closest point
-    on the smoothed lock centreline, so both layers of a double sheet share the parameter (no layer shear);
-  * lateral blend `blend` at lock borders;
-  * top 4 influences, exact uint16 sums.
-* The root sits where the mean head weight falls to `root_head_weight`. Bones are `HL_<lock>_<k>` plus `_tip` under
-  `parent_bone`.
-* Outputs `locks.json` and `<mesh>.npz`. The npz BONES list keeps the build's list as its prefix.
-* `--clearance`: per particle, the skin distance, the head-collider distance and the inward thickness, as radius inputs.
-**Cloths** (`own_bonecloth.py` plan keys `locks_json`, `lock_regions`, `sheet_links`, `tips: false`):
-* `sheet_links` adds struct lines between particle j of neighbouring locks, standing in for mesh connection.
-  * Without links, neighbours swinging opposite ways stretch the mesh up to 11.7x; with a coherent swing, 2.96x.
-  * When links exist, `create_cloth_data(parent_of=hierarchy)` keeps hierarchy parents. Without that, 13 particles took
-    a lateral parent and the line-rotation blocks broke.
-* Set `useTriangleBend 0` on line sheets: there are no triangles, and the builder raises otherwise.
-* Radius: keep it below each particle's rest distance to its colliders, so nothing starts inside. the case-study model's head sphere
-  sits 4-14 mm inside the forehead, which gives the bangs 10.5 mm.
-**Assembler hooks** `own_hair_locks.add_bones(locks_dir, P=, spath=, w_rest=)` right after the skeleton, then
-`own_hair_locks.reskin(m, locks_dir, name, known_bones=SPATH)` right after `MeshBuilder.build`:
-* `reskin` raises if the build's vertex order differs from the cut.
-* The lock bones stay out of skeleton.json, so Tpose, Face_Pose and the Rig lists are unchanged. The shipped Tpose is a
-  humanoid muscle clip without hair, and `FaceRig.Init` re-collects every head child into faceBonesL/R/M at runtime
-  (`getChildBones`, no filter).
-* End-to-end check without the game: `scripts/verify_bonecloth_integration.py`. the case-study model: ALL_OK, 121 lock bones, rest
-  skinning error 8e-8 m, ClothData regenerated from the written bundle equal (`<WORK_DIR>/proof/hair/`).
-**Clipping bound without the game.** Measure the skin under and near the hair against the cloth's colliders: gap = how
-far the skin lies outside the colliders, and a particle of radius r sinks at most (gap - r). the case-study model: back of the head 0,
-bangs at most 1.5 mm, shoulder tops at most 6.5 mm (28 vertices, no standard shoulder collider);
-`<WORK_DIR>/proof/hair/head_collider_coverage.json`. Apply the same radius rule to garment tips (jacket 10 -> 4 mm,
-cuffs 10 -> 5 mm, so they no longer start inside the ass and forearm colliders).
-**In-game hair proof.** `scripts/ingame_test/hair_motion_capture.py` plays the same animated scenes for each actor and
-records the head from the back, side and front, with mp4s and contact sheets. Do not judge hair with the harness
-`rotate`: it applies the whole yaw in one frame, a step over `teleportRotation` (45 deg) resets the cloth, and the part
-above `maxRotationSpeed` (720 deg/s) is ignored (`WorldInfluence.rotationIgnoreRatio`), so the swing is damped and
-unrealistic. Animation is what the user sees.
-**Pieces the artist painted (2026-10-19, a requirement).** A stylised hair sheet can
-be one connected mesh (the case-study model: 1 899 vertices, one source island) whose texture paints separate pieces (7 dark panels with
-light borders on the inner side). Rigged as one surface it reads as one plate with drawn lines.
-* `scripts/own_hair_panels.py` finds the pieces as texture components inside one UV island (masked by the island's own
-  triangles, since the background is dark too).
-* It gives every sheet vertex a distance to each piece: by texture on that island, and by the shared back-view
-  projection for the other layer (a 3D closest point breaks where the layers diverge).
-* It splits the triangles on the medial line d_k = d_k+1 (marching triangles, every attribute interpolated) and
-  duplicates the vertices there, except where the creator's head weight is >= 0.9, so the scalp cap stays whole.
-* `own_hair_locks.py` mode "panel" then gives one chain per piece. Its hang distance must use the UNCUT surface:
-  otherwise a corner cut off from the cap gets s = 1, folds the centreline back up and skins top vertices to the tip
-  bone (35x stretch).
-* the case-study model result: 7 panels, max edge stretch 2.8 vs 10.8 for the creator's rig. The assembler swaps the whole mesh:
-  `reskin` sees `V_SRC` and checks the build equals the mesh that was cut.
-**Hair clipping toolchain (AUTO).**
-* `hair_clip_check.py`: hair vertices inside the body and garments, at rest or in harness `diag` dumps (the game's own
-  hair bakes vs the CPU-skinned body).
-* `own_hair_colliders.py`: hair-only colliders, children of the standard slots, covering the zones the garment-fit
-  colliders leave outside:
-  * capsules along a slot axis;
-  * least-squares spheres for mounds;
-  * deep capsules or k-means sphere covers for patches such as the shoulders.
-  Listed by hair cloths only.
-* `hair_pose_gate.py`: drapes every hair cloth in real game poses with its colliders and counts skin penetration, plus
-  the rest push (particles that start inside a collider pop at spawn).
-* `hair_solve.py`: grid over particle-radius scale and collider allowance, and drops any hair collider that a cloth's
-  styled rest shape already sits inside.
-* the case-study model m21pre in game, before v3: back hair 10-99 vertices inside, up to 30 mm; long strands 29-98, up to 30 mm.
-**Capture lesson.** The harness `pose` re-poses whatever actor is loaded: a scene's Human(actorA, name) then shows the
-previous character for every name. Use `scene` (a full load, fresh actors) and check `target <name>` in the log.
-A stem copied into Mods after game start cannot be loaded without a restart.
-
-## 9. Hair collision solve: per-cloth collider copies and solve parameters (2026-10-19) [obs: offline gate on game-pose dumps]
-
-Order for any long-hair model:
-1. Cut the hair (section 8).
-2. Fit hair-only colliders.
-3. Solve the radius x allowance grid.
-4. Gate offline.
-5. Deliver.
-6. Check in game.
-
-The cookbook script is `<WORK_DIR>/resume/hair_resolve.sh <tag>` (about 12 min, `lowprio --mem 8`).
-
-**Hair-only colliders** (`scripts/own_hair_colliders.py`, cfg example `<WORK_DIR>/own/bonecloth/hair_colliders_cfg_m21d2.json`):
-- They are children of the standard `ClothColliders/<slot>` transforms. Rig.Init re-parents the slots and carries the
-  children along, so there are no new rig bones.
-- Fit them to the *body the build ships*: shape keys held at a value, such as BreastRest at 100, must be baked into the
-  body npz first. A fit on the old body leaves the strands 2-7 mm inside the grown breast.
-- Shape rules:
-  - Limbs and neck: a capsule along the slot axis (quantile 0.97, allow 2-3 mm).
-  - Chest: a deep capsule (`depth_mm`), so it does not bulge in front of the sternum.
-  - Breasts and shoulders: **k-means sphere covers** (`shape: "spheres"`, count 5, depth 25 mm, allow 3 mm).
-  - One least-squares sphere per breast bulged up to 34 mm at the cone's lateral slope, which caused a 33.7 mm spawn
-    push. Five spheres brought it to 24 mm; a tighter cover is still open.
-
-**Per-cloth collider copy rule (tailoring, `hair_solve.drop_rest_colliders`):**
-- If a cloth's styled rest particles (radius x scale) already start inside a hair collider deeper than `--pop-mm`, that
-  cloth gets its own copy `<name>__<cloth>_CC` with the radius reduced by the deficit. Other cloths keep the full
-  collider. Dropping the collider or shrinking it for every cloth both measured worse.
-- **Exception, `--no-tailor <cloth>:<collider substring>`:** use it where the *body grew under the styled hair* (breast
-  shape keys). There the push-out at spawn is correct: the hair must move off the new breast.
-- **Partial tailoring, `--no-tailor <cloth>:<substring>@<mm>`:** the copy shrinks only by (deficit - mm), so at most
-  mm of spawn push remains. This is the middle ground between full tailoring (strands stay inside the grown breast) and
-  none (24 mm float).
-- Check the size of that push with `_rest_push_detail` in the gate's rest state ([particle, start depth mm, collider];
-  `hair_pose_gate.py` without `--diag`). Over about 8 mm the hair visibly floats; fix it with a smaller tip radius or a
-  tighter cover.
-
-**Solve parameters that won (the case-study model, 6 cloths, 13 game-pose states):**
-- radius scale 1.25 x the donor curve; collider allowance 2.0 x the fit; 2 chains per painted back panel with links
-  only inside a panel (`sheet_links: "within_group"`, split `per_panel: 2`).
-- Grid score is lexicographic (rest push > pop_mm, inside total, deepest, rest push).
-
-| Setup | Doggy result |
-|---|---|
-| 1 chain per panel | 30, up to 16 mm |
-| 2 chains per panel | 18, up to 10.4 mm |
-
-Remaining for a head-down pose: back panels enter the face. Options are a head-front capsule for B_HairBack only, or
-more bones per panel.
-
-**Clip check in game:**
-- The diag dumps hold exact hair vertices (`diag_bake_FBX__<mesh>.bin`, world space).
-- The body bake (`Body_`, plus `Body_Breasts` and `Body_Ass` for the cloth jiggle) has the *assembled* vertex count:
-  90489 in game vs 70209 in the npz. It cannot pair with the npz triangles.
-- `scripts/bundle_mesh_tris.py <tfa> <cache> Body_ Body_Breasts Body_Ass Outfit_Full` caches the bundle's own triangles
-  per md5.
-  - It reads the raw Mesh bytes: find the m_VertexData header (vc, 14 channels, pos Float32x3), then the int32 length
-    that ends there. The typetree of a 90k-vertex mesh with shapes raises MemoryError under 8 GB.
-  - With two renderers of one name, the SMR under `.../FBX/` wins.
-- `hair_clip_check.py --bundle <installed tfa> --garment-mesh Jacket=Outfit_Full` uses those surfaces. On the m21a dump
-  D7_A it was identical to the CPU path, so it is validated.
-- `hair_motion_capture.keep_diag` keeps these bakes (`KEEP_BAKES`).
-
-**Capture validity:**
-- Use the `scene` command per actor, check the target (`INVALID.txt` when the log shows NOT found), and write
-  `installed.txt` (md5).
-- Never use `pose` to switch actors: it reuses the loaded actor.
-- A stem copied into Mods after the game started cannot load.
-- Long diag names need the `\?\` prefix (MAX_PATH).
-
-
-## 10. Soft-tissue patch cloth (M_Breasts / M_Mouth / M_Ass / M_Throat): budget and error-driven reduction (2026-10-25) [obs: offline on the m21d inputs; in-game A/B pending]
-
-Why: perf gate (frame time equal or better than the best shipped character). cost_model 3.3: m21d patches were x2.3 particles, x3.8 constraints, x7 bone entries of tifa.
-Recipe (all AUTO, `<WORK_DIR>/own/bonecloth/patches/`; reasoning and numbers in `PATCH_BUDGET.md`):
-1. **Drop dead constraint lists.** The solver runs a bend/near list only if the profile enables it (`RestoreDistanceGroupData.IsValid`: type 1 = `useBend`, type 2 = `useNear`;
-   `RestoreDistanceConstraint_DistanceJob__Execute` returns otherwise). The game's M_Breasts/M_Ass/M_Throat profiles have `useBendDistance 0`; only M_Mouth uses bend.
-   `own_cloth.build(prune_dead=True)` (default) reads `data/cloth_param_profiles.json` (`profile_flags`) and builds only enabled kinds: the case-study model 118 374 -> 55 754 + 7 148 constraints, no change in look or motion.
-2. **List only the bones a patch weights** (`own_cloth.build(compact=True)`, cfg `cloth_compact_bones`; assembler edits by `patches/apply_cloth_compact.py`): the virtual
-   MeshData, patch Mesh, patch SMR `m_Bones` and `MagicaVirtualDeformer.boneList` (shipped 13-55 bones each; ours listed the whole skeleton): the case-study model 668 -> 58 bone entries.
-3. **Reduce particles by error, not by one length.** A global `reduce_mm` merges vertices whose shape deltas differ (Vagina key up to 35 mm, InnerMesh 40, Mask_* collapse
-   shapes): the merged particle carries the MEAN delta, so the render vertices of one particle are pulled together/apart. Measured on the m21d as-built patches (every shape at weight 1):
-   Breasts p99 22.7 mm / max 39.4 mm error, Throat p99 3.9, Mouth p99 2.6; the Ass avoided it only by NOT reducing (6 334 particles, exact welds). The fix is in `magica_gen.build_virtual`:
-   `shape_tol` {shape: tolerance m}, `rot_aware` (predicted error includes the particle frame's rotation under the shape: `(mean delta - D_i) + (R1 R0^T - I)(P_i - centre)`),
-   `vec_tol` (open/push directions), `bone_w_tol` (skinning weights), `label` (border/core never merge), `tol_scale` (per vertex), plus `max_tri_valence 15`, `max_normal_deg 60`;
-   and `child_weights(shapes_r, shape_tol)` (a render vertex binds only to particles whose shape deltas agree with its own: otherwise a mask border drags it 43 mm).
-   In `own_cloth.build` these come through `virtual_opts` (`shape_tol_mm` = {"*": mm, "<shape prefix>": mm}, longest prefix wins; `region_tol_scale`), `verify=True` adds
-   `report["fidelity"]` (`patch_verify.py`: `shape_error`, `pose_error` with the runtime's own frame convention; rest error 1e-15 m).
-   Tolerances (mm): Vagina/Anus/Muscles 1.0, InnerMesh 3.0 (hidden under garments), Mask_* 4.0, Robotic_/Default_ 3.0, face keys 0.6, vec 0.3, bone weights 0.12, reduce length only a cap (8 mm).
-   Profile T (`patches/cloth_profile_T.json`): Mouth/Ass x1.2, Throat x1.5 -> 4 323 particles, 29 174 constraints (tifa 4 363 / 31 198), error: vulva (Vagina shape) mean 0.4, p99 1.5 mm; breast shapes <= 0.6 mm p99 visible, 3.3 mm hidden.
-4. Shipped density (struct edge median, tifa/succubus): Breasts ~9.5 mm, Mouth 3.4-3.5, Ass 3.1-4.4 with p95 21-23 mm (variable resolution), Throat 10-13 mm; profile T lands on the same numbers.
-Pitfalls: a uniform reduce looks fine at rest (child binding is exact at rest) and breaks only under shapes/garments; do not loosen Mask_* above 4 mm (a few hundred rotating vertices show
-10 mm in every variant, that is the baseline); `Fixed` border particles must not absorb core vertices (`label`); always run `verify=True` and read the per-class table before accepting a profile.
-Not done here: dropping shape channels (241 on the m21d patches) = per-frame managed blend-shape sync loops (cost_model 3.2), owner integrator/skinning.
-
-
-## 11. Patch budget on the TRUE build inputs, profile T2b, built-data check with the sim port (2026-10-25 evening) [obs: offline + sim port; in-game A/B in `<WORK_DIR>/proof/cloth_ab`]
-
-**Lesson (cost me one build): measure every cloth budget on the exact arrays of the target build.** Profile T was tuned on the m21d body inputs (4 323 particles predicted) and built as 5 545
-(Breasts 1 009 / Mouth 822 / Ass 3 448 / Throat 266) because the real assembler feeds the patches the cross-wear standard InnerMesh (median delta 38 mm), clip-fix masks, skin-repair weights and the futa merge.
-`scripts/patch_inputs_dump.py <assemble_cfg.json> <dir>` runs the assembler head up to the patch loop (read-only, ~90 s, cannot drift from the assembler) and writes the inputs;
-`own/bonecloth/patches/patch_inputs.py load_dump`, `exp_true.py`, `fam.py` rebuild/verify any profile on them. Gate for a profile: particles <= tifa (4 363), struct+bend <= 31 198, bones <= 104, then fidelity.
-What moved the counts: InnerMesh tolerance (hidden under garments; x2-x3), the reduce-length cap (8 -> 12 mm), bone-weight tolerance only for the Mouth; region scales and tighter vulva tolerances cost more than they gave.
-What the cap does to quality: the Ass pose error (LBS nonlinearity of merged clusters under 90 deg hip flexion) grows with the cap: cap 8 -> p99 2.3 mm, 8.5 (+ bone-weight tol 0.06) -> 3.1, 12 -> 5.1 with a 12.7 mm maximum
-(sim port, real cowgirl/spread dumps); the exact weld of the m21p2 Ass has 0. Final T2b: Ass cap 8.5 / bw 0.06 / InnerMesh x3, others cap 10-12: 4 328 particles, 29 570 constraints, 59 bones.
-**Independent check with the sim agent's port of the game's patch runtime** (`scripts/sim/sim_cloth.Patch`, packs from `sim_pack.py --smr body`): `patches/sim_ab.py A B` evaluates virtual-mesh skinning + shape records +
-frames + child skinning of the BUILT data against the patch SMR skinned directly (the ideal) on rest / random / in-game diag poses and shape sets; `--whatif-inputs/--whatif-profile` evaluates a profile
-before any build. It validated the compact bone lists and shape-record packing of m21p2c (agrees with the builder's own model) and exposed two things the builder model did not show: the cap/pose trade above,
-and that a particle left without triangles has no recomputed frame (new guard in `magica_gen.build_virtual`: a merge may not isolate a particle).
-Not a cloth defect but found on the way: the cross-wear InnerMesh has +-95 mm deltas on 26 vulva-slit vertices (opposite directions inside one weld group); the full-resolution ideal itself spikes 117 mm there.
-In-game A/B protocol (needs the game lock; `patches/ab/`): `ab_run.py --stems A B [C]` loads the same the case-study model QA scene per stem (partner body hidden), time-locked 25 fps camera records of chest/vulva/mouth views and 14 `diag` samples
-(Body_ + 4 patch SMRs + transforms); `ab_analyze.py` = rms excursion of the patch vertices in the torso/head bone frame per stem and mean-shape difference; `ab_sheets.py` = sheets + side-by-side mp4.
-
-
-## 12. Hair v4: three cloths that cost no more than shipped hair, solved offline (2026-10-25) [obs: offline gate on 14 game pose dumps; in-game liveliness pending]
-
-Goal : hair cost <= shipped (tifa 7 cloths / 206 particles / 57 collider refs / 1 730 particle x collider pairs; succubus 3 / 84 / 32 / 893; rangiku 5 / 58 / 53 / 942) with less clipping than the m21d3 set
-(6 hair + 4 garment cloths, 198 particles, 154 refs, 4 187 pairs). Result `own/bonecloth/deliver_v4c` (README = the numbers): 3 cloths, 117 particles, 505 constraints, 41 refs, 1 417 pairs; offline inside-skin vertices 625 -> 289, deepest 39.9 -> 17.2 mm, spawn push 24 -> 8.5 mm (v4b, the first delivery: 353).
-Recipe (all AUTO, `own/bonecloth/v4/`, chains `<WORK_DIR>/resume/hair_v4_chain.sh <name> <run_solve args>` write `chain_<name>.DONE|.FAIL`, logs `own/logs/hair_v4_chain_*.log`):
-1. **Merge by behaviour, not by region**: one cloth per profile family: back panels (asuna:B_HairBack, FixedNonRotation 1), the long strands + chin strands (tifa lifeguard:B_HairFront, FNR 1), bangs + temples + tufts (power:B_HairFront, FNR 0);
-   `own_bonecloth.lock_chains` lets several lock regions share one MagicaBoneCloth (`make_plan.py`). 10 cloths -> 3 saves the per-cloth team/job overhead; particles are what the lock cut gives (7 panels x 8, ...).
-2. **Collider design is the whole game**: a straight capsule over a curved patch (shoulder, forehead) bulges 15-30 mm and pops the styled hair at spawn; hair-only SPHERE covers (k-means on the skin patch, 3 per shoulder/forehead/face,
-   `own_hair_colliders.py` zone shape "sphere") beat capsules (744 vs 464 inside after the same solve), a cone fitted to BreastRest (`shape:"cone"`) hugs the breast. Styled hair can sit INSIDE the body at rest (the body grew after styling:
-   BreastRest v2, shoulders): the spawn push then removes real clipping; tailoring (shrinking the collider by the deficit, `hair_solve.py`, `--pop-mm 3`, `--no-tailor cloth:substring@mm`) trades that against pop and costs coverage.
-3. **hair_solve grid on the real pose dumps** (`run_solve.py <name> --radius-scales ... --lists ... --colliders-cfg ... --colliders-json ...`): particle radius x1.25 won (x0.6 / 0.8 / 1.0 / 1.25 / 1.5 = 954 / 746 / 464 / 349 / 298 inside; x1.5 deeper and more push);
-   a smaller radius for the bangs (x0.45/0.65), partial tailoring (<= 10 mm) and a looser Long cloth were not better (369-478); leaving the Long cloth untailored gives 337 but 14.6 mm push.
-3b. **Per cloth class collider allowance (the biggest single gain)**: the margin of a sphere cover over the skin (`allow_mm` of the zone) must match the cloth: broad back panels (particle radius 22-31 mm) need 12 mm,
-   the front hair (radius 12.5 mm, strands only ~10 mm wide) needs 3 mm and MORE spheres: five 3 mm shoulder covers per side (zone copies `lShoulderSphF`, `count 5`) instead of three 12 mm ones took the doggy front-hair clipping from 35 to 4 inside
-   (bangs/temples fall on the shoulders; with three big spheres the gaps between the spheres and the 16 mm tailoring left the skin uncovered). The same trick on the back hair (8 mm, five spheres) was worse (+20 inside); on the long strands mixed.
-4. **Prune colliders by gate, not by usage** (`prune_eval.py <solve dir> <name> '<json drops>'`, 7 min each): dropping unused spheres (Back lShoulderSph1/rShoulderSph1/lAss/rBreastCone, Long neckHair/head, Front face0/2 + shoulder1/2) cost +4 inside;
-   also dropping Back arm/hand colliders cost +200 (hands/forearms matter in sex poses). 57 -> 41 refs.
-Pitfalls: a global radius scale moves every cloth; an untailored set has spawn pushes up to 25 mm; usage tables of a collider universe are meaningless (colliders far from a cloth show huge "usage"); `make_deliver_v4.py` must exit non-zero when verify fails
-(it ran with a wrong types.cs path for three chains before I noticed: check `ALL_OK` in verify_report.json); the clip gate cannot see the hairline vertices blended to `head_base` (rigid head skin: 10 vertices, 12.7 mm in doggy, same as m21d3).
-Liveliness tooling (no plugin needed on the shared rig): `scripts/ingame_test/hair_ab.py run|analyze` (36 transform dumps per actor in one scene -> tip rms / chain length / head drive; the rms of random-phase samples is an unbiased amplitude estimate),
-`scripts/hair_param_variant.py <stem.tfa> <variant.tfa> --set '{"B_HairLong": {"restoreRotation": [0.12, 0.03]}}'` (edits MagicaBoneCloth.clothParams of a BUILT stem + clone-rename in seconds: parameter variants without re-assembly).
-Shipped long-hair parameter families for variants (`<SHIPPED_LIB_DIR>/_bonecloth/bonecloth_param_profiles.json`): tifa:B_HairC restoreRotation 0.117->0.038, maxVelocity 1.85->0.71 (clampPositionLength 0.194); asuna:B_HairBack 0.152->0.023 / 1.65->0.72;
-irelia:B_HairBack 0.165->0.108 / 1.21; our Long = tifa lifeguard:B_HairFront 0.336->0.083, maxVelocity 1.25->0.31, mass 4.73->2.22 (the stiffest of the long profiles); bangs power:B_HairFront maxVelocity 0.15 (limited by design).
-Generic copies of the patch tools for any character: `scripts/cloth_budget/` (`patch_inputs.py`, `fam.py`, `exp_true.py`, `sim_ab.py`, `sim_ab_table.py`, `sim_ab_render.py`; `README.md` = the numbered cookbook with the exact commands and the pass gates).
-Hair tools in `scripts/`: `hair_solve.py` (+ `--cloth-rs`), `hair_param_variant.py`, `ingame_test/hair_ab.py`, `ingame_test/hair_ab_table.py`, `patch_inputs_dump.py`; project drivers `own/bonecloth/v4/` (make_plan, run_solve, prune_eval, make_deliver_v4, make_readme) and `resume/hair_v4_chain.sh`.
-
-
-## 13. Thigh / tights physics: what the model has, what the game can do, decision (2026-10-25) [obs: Blender 5.2 headless on the model; game numbers from existing pose dumps]
-The model's "customizable physics for breasts / hair / clothes / tights" is the rig panel `Properties_Physics` (pose bone; `Physics` False by default, Collision / Breasts / Thighs / Butt / Hair / Clothes, cache Start 1 / End 250): drivers switch the hidden proxies
-`Shion_Phy-Thighs` (858 v, Cloth: mass 1, stiffness 10/5/5/1, damping 3, air 1, pin stiffness 0.2 on vertex group `Pin`, pressure + internal springs, CorrectiveSmooth) / `Phy-Butt` / `Phy-Boobs` / `Phy-Hair_*` / `Phy-Jacket_Cloth` on, and the nude body follows
-them through three Surface Deform modifiers (`Phy Thighs`, `Phy Butt`, `Phy Default Boobs`, strength 1). Everything is OFF in the file (a driven `show_viewport` cannot be set from Python: set `Properties_Physics["Physics"] = True`; hidden objects are not
-evaluated at all). Measurement (`own/bonecloth/thighs/measure_phy_proxy.py`, `analyze_phy.py`; root bone drops 12 cm, jumps 20 cm, lands, 24 fps; proxies with cloth vs armature only):
-| proxy | dynamic peak p95 mm | static sag mm | one coherent mode explains | dominant Hz |
-|---|---:|---:|---:|---:|
-| Phy-Thighs | 6.6 (8.0 incl. sag) | 2 | 87 % (residual 2.0 mm) | 2.1 |
-| Phy-Butt | 41 | 7 | 92 % | 2.1 |
-| Phy-Boobs | 37 | 2 | 95 % | 3.5 |
-Game side: no shipped character (134 bundles) has thigh / tights cloth; breasts have Puppet jiggle bones + M_Breasts, M_Ass is quasi-static (shipped clampPositionLength 0). The game's hips move far less than the jump test: cowgirl hips vertical range
-the case-study model m21d 1.5 cm (succubus 6.8, asuna 4.6, irelia 5.0 cm, samples of the hair A/B dumps) -> accelerations ~0.3-1.3 m/s2 vs ~10 m/s2 in the test -> thigh flesh motion <= 1 mm (about 0.3 mm for the case-study model): invisible, so a chain would cost
-particles and bone entries for nothing. **Decision: no thigh chain; the `Shion_Stockings` layer is skinned to the thigh bones (zero cost).** If it is ever wanted: two soft bones per thigh reproduce the first mode (87 % of the dynamics), weights from that mode,
-MagicaBoneCloth with ~6 particles (needs new skin weights from the skinning owner; not an assembler-only change).
-Pitfall (cost 3 Blender runs): drivers re-evaluate every property they drive - switch the SOURCE (`Properties_Physics["Physics"]`), never the driven modifier flags; hidden (`hide_viewport` / `hide_get`) objects are skipped by `evaluated_get`.
-
-**Pitfall (2026-10-25, cost one run design): harness `diag` bakes never contain the MagicaCloth patch output.** `diag_bake_FBX__Body_.bin` and `diag_bake_FBX__Body_Ass/Breasts/Mouth/Throat.bin` are `SkinnedMeshRenderer.BakeMesh`
-= bones + blend shapes only: direct skinning of the pack mesh with the dump's bone transforms and `blendshape_weights` reproduces them with 0.00 mm on every vertex, patch regions included (`patches/dbg_bake_vs_skin.py <pack> <dump> Body_`).
-The patch result is merged on the GPU path, so cloth A/B in game = pictures of identical STATIC states (`patches/ab/ab_img.py` + `ab_img_diff.py`: camshots, noise floor from a repeated first stem) or records of scenes (visual only);
-numbers need a plugin that reads the render deformer's output (open item with the researcher). `sim_ab.py` (offline, built data) is the numeric proof; the hair A/B is unaffected (bone transforms ARE in diag_transforms.json).
-
-
-## 14. MagicaCloth mesh-cloth step model, the patch output in game, numeric readout, butt jiggle (2026-10-26) [obs: decompile 0.5991 + researcher a46f0cfb; in-game numbers: proof/cloth_ab/numeric1, proof/butt_jiggle/live1]
-**Step model of one MOVABLE particle** (ForceAndVelocityJob @1804eef30, FixPositionJob @1804edc90, SpringJob @1804e34c0, ClampPositionJob @1804c1300, CopyBoneToParticleJob @1804ecf30; `data/decompiled/all/MagicaCloth_*`):
-dt h = 1/60 (Game.InitRendering sets UpdatePerSecond 60), updatePower P = 90/60 = 1.5, steps per frame n = min(4, floor((carry + frameDt)/h)) (surplus dropped), `solverIteration` 1.
-Constraint order in one step: ColliderExtrusion, Penetration, ColliderCollision, ClampDistance, Spring, RestoreDistance, RestoreRotation, TriangleBend, ClampPosition, ClampRotation (a constraint exists only if its use* flag was on when the cloth was created).
-`pos := old; next = old + h*(v*(1-drag(d))^P + h*a)` (a = gravity/external only; M_Ass: none) -> constraints modify `next` (each adds (1-velocityInfluence)*correction to `pos`) -> `v = clampLen((next-pos)/h, maxVelocity(d)*scale)`, `old = next`.
-`basePos` (the skinned virtual vertex, incl. body sliders / gape shapes) does NOT enter the integration; it only enters ClampPosition (ball centre, radius L = limitLength(d)*scale + collisionStretch; hard clamp, NO restoring force, no damping),
-Spring (`next += (base-next)*(1-(1-springPower)^P)`; pos is not compensated, so the pull is carried velocity: spring + drag + carried velocity = damped oscillator, f ~ sqrt(s)/(2 pi h), s = 1-(1-p)^1.5: p 0.05 -> 2.6 Hz, 0.10 -> 3.7 Hz, 0.16 -> 4.5 Hz)
-and the collision push logic. World influence (once per frame): `old += move*t`, move = displacement of the team centre (ClothParams.influenceTarget: pelvis_CC / spine3_CC / head_CC / neck_CC, re-parented under the animated bones, so skinned bone motion counts),
-`t = (1-ign)*(1-worldMoveInfluence) + ign`, `ign = max(0, speed-maxMoveSpeed)/speed`: **maxMoveSpeed 0 -> ign 1 -> t 1 -> the particles follow the team 1:1 = world influence OFF** (all shipped body patches); inertia needs maxMoveSpeed > 0 AND worldMoveInfluence near 1.
-BezierParam with useEndValue 0 is the CONSTANT startValue (stored end / curve values are dead); useEndValue 1 = start->end over particle depth (Bezier when useCurveValue).
-**Why the shipped patches are quasi-static** (identical in 143 bundles): L = 0 pins every movable particle to basePos each step (+ collisionStretch while a collider pushes: stretch += (0-stretch)*0.2 per step, then max(stretch, penetration)), maxVelocity 0.01 m/s (0.0001 on Breasts/Throat) kills carried velocity,
-world influence off, useSpring 0, useGravity 0. No game code writes these parameters at run time (only Girl.UpdateHoleAndPenisConnection toggles team flag 0x40 of the MOUTH team). springRadius/springScale*/springIntensity/springDirectionAtten/springDistanceAtten have no runtime reader.
-**Where the patch result lives**: MagicaPhysicsManager.renderPosList (FixedChunkNativeArray<float3>, OBJECT-local to the patch SMR, one chunk per render mesh: RenderMeshState.VertexChunkStart/Length via renderMeshStateDict[deformer.MeshIndex]) + renderVertexBlendList (blend = clamp01((sum of movable-particle link weights - 0.1)/0.9));
-Game.PreRender / MainCamera.OnPreRender uploads both and the compute CopyDeformerVertsCompute lerps `skinned[dst] = lerp(skinned[dst], renderPos[src], blend)` into the global skinned buffer: that is why `BakeMesh`/harness diag bakes are PURE SKIN and the cloth only exists on the GPU.
-Public managed accessors: `MagicaPhysicsManager.Instance.CopyToRenderMeshWorldData(meshIndex, target, Vector3[] v, n, t)` (world positions; normals/tangents meaningless) and `RenderMeshDeformer.GetEditorPositionNormalTangent(out wpos, out wnor, out wtan, null)`.
-**Numeric readout (TfaHairTune plugin v2, `scripts/ingame_test/TfaHairTune`, PRIVATE rig only)**: ops `clothlist`, `clothset` (live edits: clamp, spring, drag, maxVelocity, worldInfl [maxMoveSpeed, moveInfl, rotInfl], maxRotSpeed; read-back returned), `clothtrack` (every frame: BakeMesh skin vs cloth of EVERY vertex of the named
-deformers, displacement in actor-local axes, float16 `<out>_<deformer>.bin` [frame][vertex][xyz] + `.skin0.bin` + `<out>.json` with times and the team-centre (pelvis_CC) pose). Drivers: `own/bonecloth/patches/ab/ab_numeric.py` (states + scenes, selftest picks the accessor), `ab_numeric_analyze.py` (tables, heat sheets, k vs q vs k-again pass rule),
-`ab_numeric_sheets.py` (camshot side-by-sides), `ab_numeric_session.py` (one game-lock turn: stops the shared rig, starts the private rig with `<WORK_DIR>/resume/hair_rig_serve.sh`, runs, restarts the shared rig, releases); butt jiggle: `own/bonecloth/bj/` (`particle1d.py` port, `bj_live.py`, `bj_analyze.py`).
-**Pitfalls (each cost a run)**: (1) PIXEL A/B of identical static states is useless: the same stem rendered twice differs by 20-50 grey levels (pose / puppet / camera framing) - use the numeric readout. (2) The game resolves scene / pose paths against ITS OWN folder: a relative `--out` gives "no pose data" and the run silently
-reuses the previous actor (hair_ab run2: the four shipped rows were invalid; hair_ab / ab_img / ab_run now make `--out` absolute and flag "no pose data"/"NOT settled" as INVALID). (3) Killing a session driver (Stop-Process) leaves its `lockfile.py acquire` child alive: it still takes the lock later (release it by hand: `lockfile.py release game <owner>`).
-(4) `proc_stop.py` must accept `<RIG_DIR>_hair\` (the rig regex is built from rig_dir / rig2_dir of toolkit.json). (5) A command line that contains the words you filter processes by also matches your own shell: filter with `-like "*a*b*"` built from pieces and exclude `Get-CimInstance`. (6) A session driver must NOT restart the SHARED rig (`<RIG_DIR>/game`) when its turn ends: nobody holds the lock then and an idle game costs ~8 GB and ~4 cores next to the heavy build / solve jobs (lead rule 2026-10-26: until the clip-fix CHAIN_DONE every session ends with BOTH rigs closed). `ab_numeric_session.py` now leaves BOTH rigs closed by default (`--restart-shared` is the opt-in; the old `--no-restart-shared` is a no-op). Every turn: stop the private game in `finally`, release the lock, verify `tasklist | findstr TrueFacials` is empty.
-
-**14.1 Judge patch fidelity ON SCREEN = blend x (cloth - skin), and per shape class against the AS-BUILT numbers of the target build (2026-10-26).** The game shows `lerp(skin, cloth, blend)` per vertex with `blend = clamp01((sum of the vertex's link weights to MOVABLE particles - 0.1)/0.9)`
-(selection 1 = Move, 2 = Fixed): vertices linked only to the Fixed border particles stay pure skin, so raw cloth errors at border vertices (e.g. the neck/head border of the Mouth patch: raw 1.3-5.9 mm, blend 0-0.5 -> 0.3-2 mm on screen) are largely invisible. `scripts` side: `own/bonecloth/patches/ab/ab_blend.py <sim pack> <npz>`;
-the numeric in-game analysis (`ab_numeric_analyze.py --blend-dir`) and `mouth_max_vertices.py` (worst vertices + region names + blend) use it. Profile T2b (tuned for the m21p2c inputs) was WORSE than the as-built k in the pose classes of Breasts (p99 0.4 -> 1.5 mm) and Throat (0.7 -> 2.3) and only better in the InnerMesh classes: a profile is only accepted
-when every class and every real pose (sim port on the 8 in-game pose dumps) is <= the as-built value + noise. T2c (md5 c326fb21): Breasts cap 3 mm + `fam.prof(inner=0.8)`, Mouth = T2b, Ass = exact weld (reduce 0.01 mm: the 2-3.5k fewer Ass particles of T2b cost 3.3 mm p99 in sex poses), Throat cap 3 mm + `fam.prof(inner=0.5, fit=0.5)`, bone lists compacted: 10 045 particles vs the as-built 10 062.
-Tools: `patches/t2c_explore.py` (family survey with the builder verifier on a `patch_inputs_dump.py` dump of the target build), `whatif_pose2.py` (real-pose errors, env WHATIF_PACK / WHATIF_DUMP), `exp_true.py --noverify` for counts (the `over15` column must stay 0: the game stores the triangle count of a virtual vertex in 4 bits; the exact-weld Ass has one 56-triangle InsideVagina vertex in k as well).
-Pitfall: `waitsettle` in an ANIMATED scene always prints "NOT settled after N s (still moving)"; only "(actor missing)" means the scene did not load.
-
-## 15. Soft-tissue physics through data-only patches: depth rule, spring fit, the neck line (2026-10-26) [obs: decompile 0.5991 + sim port on the exact inputs; in-game turn pending the next build]
-**Depth rule** (own_cloth.depth_from_rule, cfg `cloth_virtual_opts[part].depth_rule`, no assembler change): every depth-curved ClothParams value is evaluated per particle at `ClothData.vertexDepthList` (CurveParam.Evaluate = linear start -> end when useCurve is off); BFS level / (max level - 1) is the shipped depth. The rule replaces it by a geodesic ramp from anchor regions
-(Ass: Vagina / InsideVagina / Anus / InsideAnus, Breasts: Nipples = areola + nipple) and from the Fixed border, smoothstep, `{"anchor_regions": [...], "ramp_mm": [0, 40], "border_ramp_mm": [0, 20]}`; with `clampPositionLength = {start 0, end L, useEndValue 1}` the ball radius is 0 at the anchors / border (= the shipped pinned behaviour) and L on free tissue.
-ClampPositionJob also has an axis box (`clampPositionRatioX/Y/Z`, limits ratio*L per axis in the particle's base rotation frame, LookRotation(normal, tangent): Z = normal) used as the normal-axis cap against clipping through bras / suit shells (3.2 mm breasts, 10 mm butt). Rest state is unchanged (only vertexDepthList + clothParams differ); `physics_bundle.py verify` compares a built bundle with `expected/*.npz`.
-**Spring fit** (`own/bonecloth/jiggle/spring_fit.py`): the game step x1 = (x + h v q)(1 - s), s = 1-(1-p)^1.5, q = (1-drag)^1.5, h = 1/60 has eigenvalues r e^(+-i theta): the NATURAL frequency is sqrt(w_d^2 + sigma^2)/2pi, not the visible peak spacing (p 0.14 + drag 0.085 = 4.74 Hz natural, 4.4 Hz damped: the first survey matched the Blender fit 4.37 Hz with the damped value, +8 %). Blender fits (thighs/RESULT.json): butt 4.37 Hz zeta 0.36 -> spring 0.121 drag 0.087; boobs 4.15 Hz zeta 0.21 -> spring 0.116 drag 0.
-Amplitude = world influence (inertia coupling k): static response k / w0^2 = 1.33 (butt, k 1) / 1.04 (breasts, k 0.7) mm per m/s2 vs Blender 0.69 / 0.76. The team spring pulls EVERY movable particle back by s per step before ClampPosition (no per-particle weight in SpringJob), so hole particles pushed out by a shaft end the step (1-s) = 82 % displaced: measure hole displacement in game (k ~ 24 mm p99).
-**Delivery without touching assemble_own.py**: cfg `class_defaults` -> a directory holding a byte copy of class_defaults.json + the modified cloth_param_profiles.json (the assembler loads the profile set from dirname(class_defaults)); patch `set` replaces WHOLE dict keys (cloth_virtual_opts, cloth_reduce_mm): every patch that sets such a key must carry the identical final dict (physics.json + neck.json are generated together by `physics_build.py`), otherwise the alphabetically last patch silently reverts the others.
-`own/bonecloth/jiggle/physics_build.py` (gates on the exact patch inputs of the target cfg, writes physics.json / neck.json / READY_*), `physics_bundle.py stem|verify` and `neck_stem.py` make test stems from a BUILT bundle by data-object edits (seconds, no build), `physics_live.py` is the in-game turn (clips + numeric tracks incl. the outward-excursion clip proxy).
-**A throat-patch step line (secondary; the usual dark neck line is near-black albedo texels on the head/torso UV seam, fixed by scripts/bundle_neckfix.py, references/27-shaders.md#gap-130)**: the Throat patch of m21f2f/h was the coarse 'T' reduction (cloth_reduce_mm Throat 12, shape tol 9 mm = 165 particles): on-screen error vs the skin 1.0-2.4 mm p99 / up to 3.8 mm in head-turned poses (doggy 2.42/3.81, spread 1.99/3.14, m1b 1.73/2.97; stand 0.08) while its border stays pinned = a step along the border. T2c Throat (reduce 3, tol 2.25 = 953 particles = shipped-class 939): p99 0.13-0.42, max <= 1.9. Rule: a patch profile is only accepted when its ON-SCREEN error in the real head-turned / spread poses is <= the as-built k (section 14.1); the first 'T' profile was accepted on stand + random-pose numbers only. Breasts had the same defect class (reduce 10 = 540 particles) and moved to T2c (2 000).
-**Pitfalls**: (1) harness `record` in mode render writes JPEG bytes into files named f_NNNN.png: `ffmpeg -i f_%04d.png` writes a 0-byte mp4 (every clip of that evening); use `scripts/ingame_test/frames_to_mp4.py` (sniffs the codec, deletes a failed 0-byte output). (2) Python text-mode read + `newline=""` write converts a CRLF file to LF: edit CRLF files with newline="" on BOTH sides (or bytes). (3) a tool-call heredoc turns a doubled backslash + n into a real newline inside a Python string: build such strings with chr(92). (4) harness commands do not run while a `record` is active (RecordStep returns first): record and pose switching cannot be interleaved; run clothtrack (plugin, its own channel) in a thread beside the harness commands instead.
-
-## 16. "Jacket mushed to the side over the breast" investigation (bonecloth agent, 2026-11-01, reference shot own/ref_shots/)
-- FACT (UnityPy dump of out_builds/v102_br0/shion.tfa, scratch jk_dump.py = components with teamData+clothParams): v1.0.2 holds exactly 10 MagicaCloth components: B_HairLong/Short/Back/Bangs/Temples/Tufts + M_Breasts/M_Throat/M_Mouth/M_Ass. NO B_Jacket / B_Sleeves / B_Pants / B_Harness (assemble_report bone_cloths lists hair only): the jacket and every garment are plain skinned meshes + fit shapes, so "jacket cloth pushed by colliders" cannot happen in v1.0.2. M_Breasts has an empty collider list.
-- The shot's content is HAIR: grey cloud-ornament strands with black outline + gold (HL_Long*), dark panels with light borders (HL_Back*), red end caps (hair ornaments), draped over the bust, background = the photo studio (wardrobe, clothes rack, red carpet). Static idle chest views (Default / JacketOpen, close side/above, soft light) look clean: proof/v103_jacket/sheet_idle_v102_r0b.jpg; bend45: sheet_motion_v102_r0.jpg; arms up / arms forward / hands on hips pile 4-8 hair panels over the bust in the same way as the shot: sheet_poseA_v102.jpg (hair strands cross the bust shell, back sides of the dark panels show).
-- Hair colliders near the bust (from the dump): lBreastCapsule_CC r 35.7 -> 25.9 mm (length 39 mm), lBreastHair0-4 spheres r 32-54 mm, chestHair capsule r 120 -> 112 mm; fitted to the old BreastRest shape, NOT re-fitted to the v103 fuller shape (bundle_breast_shape.py garments follow only <= 15 mm full / 30 mm none from the body).
-- NOT DONE (tool-call cap hit by infrastructure traps below): v103b shots, any fix, before/after. Next: ask the user which look/pose; if hair: refit lBreastCapsule/lBreastHair* + chest capsule to the fuller breast and re-shoot poseA (arms_up/forward/hands_hips, Default + JacketOpen) on v102 vs v103b; if v103 breast pokes through jacket/cover: widen bundle_breast_shape --near/--far for Outfit_Full/Open + Robotic_Breasts.
-- Tools: resume/jacket103_batches.py (--stems a,b --out --res --looks 0,4 --only idle,motion,survey; one list jk.list), jacket103_sheet.py (--byrow --cols name=root#prefix --labels hi,him,q34), jacket103_stats.py (largest near-black blob per shot), jacket103_run.sh, jacket103_chain103.sh, jacket103_cut_survey.sh.
-- TRAPS: (1) lockfile acquire is RE-ENTRANT for the same owner name: a second queue with the same OWNER gets the lock at once and drives the same game as the first = two harness clients on one game (poseA FAILED_frozen); one queue per OWNER, distinct owners for anything else. (2) rig_queue3_prio.sh keeps its pid file by LIST basename: two runs of a list called jk.list -> the second exits "already running"; name lists uniquely. (3) Stop-Process on a queue's bash pid leaves forks + python harness clients alive (18 zombies found); kill by command-line pattern built from pieces and release the owner. (4) Two the case-study model stems in one game session -> "System out of memory", 296 MB alloc in Girl.RefreshCustomization (free virtual memory 2-5 GB of 57 with other agents' Unity/Blender running): one stem per game session, PRE_CMD rig_serve.sh between stems. (5) Foreground tool calls are cut at ~180 s: use nohup + until-loop waiters.
-
-## 17. Hair colliders: refit to the ACTIVE body surface + collision-pair budget (bonecloth agent, 2026-11-01) [obs: offline on out_builds/v103_base_horn; in-game: <WORK_DIR>/proof/v103_hair/sheet.jpg]
-- Defect: the reference shot of a jacket mushed over the breast is HAIR (HL_Long / HL_Back panels) piling over the bust; v1.0.2 has no jacket cloth (section 16). Cause chain: hair colliders were fitted to the old BreastRest cone (5 spheres r 32-54 mm + capsule r 36/26 mm per breast), the V3 breast is fuller, the chin is outside every collider of 5 of 6 cloths, and the lists hold 2-45 colliders per cloth: 7,522 collision pairs (pairs = particles x colliders summed over bone cloths, gap-study metric) vs shipped 234-1,515.
-- Recipe (ONE command, 60 s, bundle edit, idempotent): `py -3 <WORK_DIR>/own/bonecloth/hair103/bundle_hair103.py <in.tfa> <out.tfa> [--report r.json] [--max-pairs 1500] [--dry]`. Surface = Body_ at the prefab rest pose + every HELD blend shape (BreastRest, OwnBodyFit), so it follows any breast shape in the input (V4: same command on the V4 bundle). Notes: <WORK_DIR>/own/bonecloth/hair103/INTEGRATION.md.
-- Fit rules that worked: least squares on skin zone points (bone-weight zones: head/chin/neck/shoulder/breast/chest/back/arms), penetration weighted x3, target skin - 2 mm, PLUS surface samples of the collider that may not poke out of the skin (without that term the capsule grows to r 87 mm and floats 15 mm). One tapered capsule per breast (r 60.8/58.6 mm, skin outside p95 1.6 mm) beats 3 spheres (2.1 mm) and the old 5 spheres + capsule (5.1 mm). L is fitted on L + mirrored R. Head: crown-to-chin capsule, chin points weighted x3 (chin p95 26-30 -> 5.6 mm).
-- No new GameObjects: unused hair-only capsule objects are re-posed (Transform + fields) as chest / back / shoulder-ridge capsules (the per-cloth chestHair__* copies under spine3_CC). Slots are never re-posed.
-- Cost: per cloth greedy set cover over the zones the cloth reaches with a cap per cloth (REQ / CAP tables = AI config in the script): Back 126 particles x 7, Long 22 x 12, Temples 20 x 8, Short 10 x 8, Tufts 8 x 3, Bangs 12 x 2 = 1,434 pairs (-81 %). The 126-particle B_HairBack carries 75 % of the cost: its list decides the total.
-- Pitfalls: (1) standard arm colliders float 25 mm above the case-study model's arms and the old shoulder spheres up to 82 mm (hovering hair): a float filter of 8 mm dropped too much, 30 mm keeps the arms and drops chestHair (85 mm). (2) A greedy stop rule relative to the INITIAL cost stops too early (shoulderR 28 mm left); relative to the current cost (3 %) it adds low-value colliders until a per-cloth cap is set. (3) Never name scratch scripts patchN.py in the shared scratch_dir: another agent overwrote patch3.py. (4) Hair materials already have _Cull 0 (double sided, shader Unified) exactly like yennefer, so the dark back faces are not a cull problem.
-- Not covered: rigid front strands (40 % of B_HairLong vertices) = hair weights (own_hair_locks.py). Frame time: perf agent A/B on rig stems shionv103f vs shionhair103.
-
-<!-- BEGIN GAP-REVIEW v1.1 -->
-## Knowledge added in v1.1 (gap review)
-
-Facts consolidated from the first import's proof notes, gap study and the reverse-engineering index; every item also has a learning record. Decompiled code is never quoted: re-derive it locally with `python tools/diag_decompile.py <Class.Method>` (docs/DIAGNOSIS.md).
-
-<a id="gap-049"></a>
-### GAP-049 - Breast soft-tissue physics: pinning the nipples makes pointed cones (high)
-
-A data-only breast MeshCloth patch that pins the nipple/areola (depth rule anchored on the Nipples region with a ramp of about 35-40 mm), a small position clamp (about 8 mm) and a normal-axis cap keeps the nipple fixed while the rest of the breast sags, so the breasts turn into pointed cones in forward and side bends and look unnatural next to shipped characters. Keep the game's own M_Breasts profile. To undo it without a rebuild, copy clothParams + vertexDepthList from a build that had the shipped profile (scripts/bundle_copy_meshcloth.py; identical particle layout, or --params-only). Gate: an in-game bend sheet (forward 30 and 60 deg, back, side) next to a shipped character. 23 搂15 still presents the anchored depth rule with the breast clamp as the method: mark it rejected for breasts.
-
-- **Check:** 23 搂15 l.490-492 describes the Nipples-anchored depth rule, the clamp and the 3.2 mm breast normal cap as the delivered method; bundle_copy_meshcloth.py is not mentioned in 23.
-- **Evidence:** case-study notes (not shipped); references/23-bonecloth.md 搂15 (l.489-497)
-- **Record:** `learnings/records/GAP-049.json`
-
-<a id="gap-050"></a>
-### GAP-050 - Breast patch density and spring must change together; start from the shipped profile (medium)
-
-23 搂15 records moving the breast MeshCloth patch from reduce 10 mm (540 particles) to a 3 mm profile (T2c, about 2 000 particles) as a fix. In game the dense patch with a softer spring (0.116) sagged and lumped, and a ~1 080-particle mix rippled more inside tight tops; the coarse patch with spring 0.14 moved best. The released build kept the coarse breast patch with the game's own breast clothParams + depth list copied from a donor bundle (bundle_copy_meshcloth.py; --params-only when the particle sets differ); the throat moved to about 950 particles, which is not a shipped class (shipped throats have 127-428, see the throat-target correction item). Correct 搂15, tune the spring together with the density starting from the shipped profile, and judge the jiggle nude and inside clothed looks against the previous build. Second pass (gap study): reference M_Breasts patches have 767-1 350 particles (corpus median 1 253); the coarse 540-particle patch (cloth_reduce_mm 10, tuned for a dropped spring profile) also rippled inside clothing, and the v1.0.2 checks were nude only. Judge breast physics in covered looks too (walk, cowgirl, doggy and grab close-ups in a top) against the previous build at the same camera. The gap study proposes about 850+ particles (cloth_reduce_mm about 7) with the game's own profile and depth list (not the Nipples-anchored rule, see the breast-pinning item), and a stiffer profile only for steps where a top or armour covers the breasts.
-
-- **Check:** 23 l.497 still says the breasts moved to T2c (2 000 particles). Second pass: the same line calls the 953-particle throat 'shipped-class 939'.
-- **Evidence:** case-study notes (not shipped); references/23-bonecloth.md 搂15 (l.497: 'Breasts ... moved to T2c (2 000)')
-- **Record:** `learnings/records/GAP-050.json`
-
-<a id="gap-051"></a>
-### GAP-051 - Hairline vertices pulled into the scalp by lock roots (medium)
-
-When hair-lock skinning blends head_base into the lock roots, the hairline vertices are pulled into the scalp as the roots rotate (in a head-down doggy pose 13 of 33 inside vertices were head-dominated). This is a weighting problem, not a collider one. Fix in this order: narrow the hairline blend (keep the creator's head weight) or pin the first particle of each lock, then add a head collider for the back-hair cloth only. Check with a per-cloth-bone pose gate (inside vertices grouped by dominant bone).
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-051.json`
-
-<a id="gap-052"></a>
-### GAP-052 - Buttock jiggle tuning moves the holes (low)
-
-Buttock-jiggle variants tested on the first import also loosened the vagina/anus region (p99 deviation 24 mm -> 40-65 mm). Gate every buttock physics change with the hole metrics (rim and canal deviation in penetration and spread poses) as well as the jiggle amplitude, and choose a variant only when both are acceptable.
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-052.json`
-
-<a id="gap-053"></a>
-### GAP-053 - Prove that each cloth actually simulates before keeping or tuning it (low)
-
-On the first import the jacket, sleeve, pants and harness bone cloths moved no vertex in game and were dropped (the coat runs on static weights) only several builds later. Gate: for each garment cloth measure the in-game vertex displacement during a walk or turn (at least a few mm at the hem) and its frame cost; remove or rebuild a cloth that moves nothing and report the change. A still shot of hair in its rest shape does not prove a bone cloth is inactive: take two diag dumps about 0.33 s apart and check whether the bones moved in head space (dumps 2 s apart under-sample the swing). Before declaring hair stiff, compare it per actor in Bone_Head space at a matched head drive: moving share, median and p90 path, max swing (the first import reached about the shipped median but under half of the shipped long-hair max swing).
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-053.json`
-
-<a id="gap-054"></a>
-### GAP-054 - Hair-collider primitive for an enlarged breast rest shape (low)
-
-After a breast rest-shape change (a blend shape held at 100), k-means sphere covers on the breast either push the hair out at spawn (17-42 mm) or let spread strands clip (10-15 mm). A primitive that follows the breast cone works better: a capsule along the nipple axis, or spheres fitted on the surface (centre = surface point - normal x r, r about 40 mm), plus per-cloth radius tailoring. Re-solve the hair colliders whenever the body rest shape changes.
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-054.json`
-
-<a id="gap-055"></a>
-### GAP-055 - Cloth-collider capsule proportions: MagicaCapsuleCollider length is centre-to-end (medium)
-
-In the developer's own cloth-collider sets a capsule is about half a bone segment long, and limb capsules are thicker than the bare skin distance. Use these proportions as the starting point when generating bone-cloth colliders for a new model, then tailor the radii to the rest-shape clearance. The rule comes from one recreation study: check it on two or three more shipped characters before treating it as fixed. Second pass: the recreation study explains the half-segment rule - MagicaCapsuleCollider length is measured centre-to-end, so use length = 0.5 x the bone segment with the centre at the segment midpoint (full-segment lengths double the capsules); this part follows from the component and needs no survey. Radius = about the 90th percentile of the skin distance (not the median), with thicker hands and forearms than intuition (reference thigh length 0.179 / r 0.094, calf 0.230 / 0.062, hand 0.056 / 0.05, forearm 0.131 / 0.05 m); head, neck and pelvis capsules on axis 0. Thin hand capsules let hair and cloth pass through; the radii still come from one study.
-- **Note:** Priority raised from low to medium by the merged second-pass gap.
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-055.json`
-
-<a id="gap-056"></a>
-### GAP-056 - Uncalled MagicaCloth and LOD components present in GameAssembly (low)
-
-GameAssembly keeps MagicaCloth classes that no game code names (MagicaPlaneCollider, MagicaDirectionalWind/WindComponent) and a runtime progressive-mesh LOD (MantisLOD ProgressiveMeshRuntime, distance or screen-ratio LOD). The Assembly-CSharp corpus has no named caller for them, so [inf] they act only when a bundle's prefab carries the component; repeat the caller search with the single-underscore call-site form (see the corpus caller-search item in 18) before relying on that. A .tfa might use, for example, a plane collider as a floor for long hair or skirts, but this is untested: confirm the class exists in the target build's types.cs and prove it in game first.
-- **Evidence:** `the local decompiled corpus (tools/diag_decompile.py)*.c, MagicaCloth_WindComponent__*.c, MantisLODEditor_ProgressiveMeshRuntime__*.c` (caller grep: no named hits outside their own methods)
-- **Record:** `learnings/records/GAP-056.json`
-
-<a id="gap-121"></a>
-### GAP-121 - Soft-tissue patch borders: keep off material seams, copy border-moving shapes (high)
-
-Keep MeshCloth patch borders off material/SSS seams: reference throat-patch top borders lie 6.7-81.8 mm from the head/torso seam (tifa median ~18 mm, under half the border on it); with 81 % of the border on the seam, the pinned ring and the profile switch shared one edge. Every Body_ blend shape that moves patch-border vertices (InnerMesh, fit keys) must be on the patch with identical deltas, and split vertex pairs on the seam need identical deltas, or a 3-4 mm crack opens under head turns. Gate: border separation 0 mm with each shape at 100 %, then an under-chin shot with the head turned.
-
-- **Check:** No reference keeps patch borders off material or SSS seams or requires identical border shape deltas (grep: patch border, identical deltas, seam near patch border; only 28-asset-techniques l.204 mentions fixed particles on the patch border).
-- **Related:** `references/27-shaders.md`
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-121.json`
-
-<a id="gap-122"></a>
-### GAP-122 - Correction: throat MeshCloth particle target ('shipped 939' does not exist) (high)
-
-Measured over 262 characters, M_Throat MeshCloth has 127-428 particles (median 195, 52-190 moving); the 5 main references 168-344. A 165-particle throat was already reference-class, so raising it to ~950 changed a variable that never differed, left the neck line and cost perf. The skill text calling 953 particles 'shipped-class 939' (23-bonecloth 搂15 l.497) and the playbook's 'match the shipped particle count' for the throat (part 2 item 9) are wrong and should be corrected: build 170-340 particles, ~250 border verts, >= 55 % fixed. Rule: every 'like shipped' target cites >= 3 measured shipped values with the tool output path.
-
-- **Check:** 23-bonecloth 搂15 l.497 still reads 'T2c Throat (reduce 3, tol 2.25 = 953 particles = shipped-class 939)', and the playbook part 2 item 9 (l.743) says to match the shipped particle count for the throat.
-- **Related:** `references/00-new-model-playbook.md`
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-122.json`
-
-<a id="gap-123"></a>
-### GAP-123 - Garment cloth parity: gate Girl.m_clothingCloths (high)
-
-15 of 24 surveyed shipped characters list garment cloth in Girl.m_clothingCloths (aerith 8, 2b 4, tifa 3). A garment rebuild silently dropped every garment cloth (empty list) and left the source's garment physics bones unused, so coat tails and flaps were rigid. Gate: if the source has garment physics bones, the list is non-empty and each cloth switches with its garment slot. Build: a tip particle per chain, shipped profiles (clothing/sleeve/holster types), radius under the rest clearance, colliderList = standard pelvis/spine/thigh/ass _CC; no 'Cloth collider not found' in the log. A garment cloth that moves nothing is rebuilt, not dropped (see the cloth-simulates proof item in 23).
-
-- **Check:** 23 l.28-31 documents Girl.m_clothingCloths (tifa: B_Skirt, B_Belts, B_Suspenders) and its cross-wear use, but no gate requires the list to be non-empty when the source has garment physics bones (grep: clothingCloths near empty or gate: 0 hits).
-- **Related:** `references/25-cross-wear.md`
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-123.json`
-
-<a id="gap-124"></a>
-### GAP-124 - Hair collider budget and the chin-to-crown head_CC (medium)
-
-Reference hair: 234-1,515 hair collision pairs per character, at most 24 colliders per hair cloth, ~31 colliders in total; rigid vertex share median 1.1 % over 58 hair cloths. head_CC is a chin-to-crown capsule (~10 deg tilt, top ~+85 mm r 65, bottom ~-25 mm and +45 mm forward r 45; it ends 64-138 mm below the head bone), so the chin is inside a collider. A cranium-sphere head_CC leaves the chin bare and strands pass through it. Give each cloth only colliders within reach (cap 24); only head_CC's world shape matters, not its rotation fields.
-- **Related:** `references/37-zero-loss-performance.md`
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-124.json`
-
-<a id="gap-125"></a>
-### GAP-125 - Soft-tissue patch open/push vector coverage per patch (medium)
-
-Reference soft-tissue patch vectors are sparse and region-specific (uv4.xy+uv5.x = open, uv5.y+uv6.xy = push): Breasts open 0 % / push 100 % of vertices, Ass open 0 % / push 41 %, Mouth open 77 % / push 77 %, Throat none. An Ass patch that opens its whole surface and pushes everywhere drives buttock/vulva skin by cloth where the author leaves it skinned; a Mouth open area of 49 % is too small. Also bind every collision-body vertex that coincides with a Mouth patch vertex (reference 143 bound pairs vs 3).
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-125.json`
-
-<a id="gap-126"></a>
-### GAP-126 - Tool port: physics and integration comparison (medium)
-
-Port gap_study/physics (dump_ours.py dumps a built .tfa in the shipped-library 'full' layout, physics classes only; metrics.py runs identical code on both sides: cloth particle counts, colliders per cloth, collision pairs, breast weights and pivots, hair rigid share) and gap_study/integration (dump_ours.py; compare.py: head_CC world axis/tilt, colliderLists, stockings push, inactive FBX items; def_weights.py: 'Bone not found' lines per cross-wear transfer and frozen-vertex share).
-- **Related:** `references/43-scripts-index.md`
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-126.json`
-
-<a id="gap-127"></a>
-### GAP-127 - Soft-tissue patch reset on teleport (low)
-
-An own M_Ass patch with an inertial profile had useResetTeleport 0, so pose jumps and teleports carried stale cloth motion; set useResetTeleport 1 (0.2 m / 45 deg thresholds) like the other patches and check the patch right after a pose snap.
-- **Evidence:** case-study notes (not shipped)
-- **Record:** `learnings/records/GAP-127.json`
-<!-- END GAP-REVIEW v1.1 -->
+{
+  "tifa:B_Suspenders": {
+    "clothParams": {
+      "radius": {
+        "startValue": 0.033799998462200165,
+        "endValue": 0.03700000047683716,
+        "useEndValue": 0,
+        "curveValue": -0.49000000953674316,
+        "useCurveValue": 0
+      },
+      "mass": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useGravity": 0,
+      "gravity": {
+        "startValue": -10.0,
+        "endValue": -9.800000190734863,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "gravityDirection": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "useDrag": 0,
+      "drag": {
+        "startValue": 0.01899999938905239,
+        "endValue": 0.019999999552965164,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useMaxVelocity": 0,
+      "maxVelocity": {
+        "startValue": 0.23000000417232513,
+        "endValue": 3.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "influenceTarget": null,
+      "maxMoveSpeed": 20.0,
+      "maxRotationSpeed": 720.0,
+      "worldMoveInfluence": {
+        "startValue": 0.9710000157356262,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "worldRotationInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "massInfluence": 0.0,
+      "windInfluence": 0.0,
+      "windRandomScale": 0.0,
+      "useDistanceDisable": 0,
+      "disableReferenceObject": null,
+      "disableDistance": 20.0,
+      "disableFadeDistance": 5.0,
+      "useResetTeleport": 0,
+      "teleportDistance": 0.20000000298023224,
+      "teleportRotation": 45.0,
+      "teleportMode": 0,
+      "resetStabilizationTime": 0.10000000149011612,
+      "useClampDistanceRatio": 0,
+      "clampDistanceMinRatio": 1.0,
+      "clampDistanceMaxRatio": 1.1100000143051147,
+      "clampDistanceVelocityInfluence": 1.0,
+      "useClampPositionLength": 0,
+      "clampPositionLength": {
+        "startValue": 0.0,
+        "endValue": 0.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampPositionRatioX": 1.0,
+      "clampPositionRatioY": 1.0,
+      "clampPositionRatioZ": 1.0,
+      "clampPositionVelocityInfluence": 1.0,
+      "clampPositionFrictionFactor": 1.0,
+      "useClampRotation": 0,
+      "clampRotationAngle": {
+        "startValue": 25.0,
+        "endValue": 30.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampRotationVelocityLimit": 1.0,
+      "clampRotationVelocityInfluence": 1.0,
+      "restoreDistanceVelocityInfluence": 1.0,
+      "structDistanceStiffness": {
+        "startValue": 10.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useBendDistance": 0,
+      "bendDistanceMaxCount": 6,
+      "bendDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useNearDistance": 0,
+      "nearDistanceMaxCount": 3,
+      "nearDistanceMaxDepth": 1.0,
+      "nearDistanceLength": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.05000000074505806,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "nearDistanceStiffness": {
+        "startValue": 0.30000001192092896,
+        "endValue": 0.30000001192092896,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useRestoreRotation": 1,
+      "restoreRotation": {
+        "startValue": 0.1899999976158142,
+        "endValue": 0.0,
+        "useEndValue": 0,
+        "curveValue": -0.4000000059604645,
+        "useCurveValue": 0
+      },
+      "restoreRotationVelocityInfluence": 1.0,
+      "useSpring": 0,
+      "springPower": 0.017000000923871994,
+      "springRadius": 0.10000000149011612,
+      "springScaleX": 1.0,
+      "springScaleY": 1.0,
+      "springScaleZ": 1.0,
+      "springIntensity": 1.0,
+      "springDirectionAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.23399999737739563,
+        "useCurveValue": 1
+      },
+      "springDistanceAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.39500001072883606,
+        "useCurveValue": 1
+      },
+      "adjustMode": 0,
+      "adjustRotationPower": 5.0,
+      "useTriangleBend": 0,
+      "triangleBend": {
+        "startValue": 0.029999999329447746,
+        "endValue": 0.029999999329447746,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useVolume": 0,
+      "maxVolumeLength": 0.05000000074505806,
+      "volumeStretchStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "volumeShearStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useCollision": 1,
+      "friction": 0.5,
+      "staticFriction": 0.0,
+      "isThroat": 0,
+      "usePenetration": 0,
+      "penetrationMode": 0,
+      "penetrationAxis": 2,
+      "penetrationMaxDepth": 1.0,
+      "penetrationConnectDistance": {
+        "startValue": 0.10000000149011612,
+        "endValue": 0.20000000298023224,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationDistance": {
+        "startValue": 1.0,
+        "endValue": 0.2800000011920929,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationRadius": {
+        "startValue": 0.5,
+        "endValue": 0.10999999940395355,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useLineAvarageRotation": 0,
+      "useFixedNonRotation": 0
+    },
+    "cullingMode": 0,
+    "clothTarget": {
+      "connection": 1,
+      "skipRestore": 1,
+      "isSkirt": 0,
+      "nonLoopMesh": 0,
+      "rootNameList": [
+        "L_SuspenderC_Spo",
+        "R_SuspenderC_Spo",
+        "C_SuspenderB_Spo",
+        "L_SuspenderD_Spo",
+        "R_SuspenderD_Spo",
+        "L_SuspenderE_Spo",
+        "R_SuspenderE_Spo",
+        "C_SuspenderA_Spo"
+      ],
+      "sameSurfaceAngle": 90.0
+    },
+    "colliders": [
+      "lBreastCapsule_CC",
+      "rBreastCapsule_CC",
+      "spine3_CC",
+      "spine2_CC",
+      "spine_CC"
+    ],
+    "particles": 32,
+    "fixed": 16,
+    "maxLevel": 3
+  },
+  "tifa:B_HairC": {
+    "clothParams": {
+      "radius": {
+        "startValue": 0.017000000923871994,
+        "endValue": 0.03999999910593033,
+        "useEndValue": 1,
+        "curveValue": -0.2199999988079071,
+        "useCurveValue": 1
+      },
+      "mass": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useGravity": 1,
+      "gravity": {
+        "startValue": -8.15999984741211,
+        "endValue": -9.130000114440918,
+        "useEndValue": 1,
+        "curveValue": 0.11999999731779099,
+        "useCurveValue": 1
+      },
+      "gravityDirection": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "useDrag": 1,
+      "drag": {
+        "startValue": 0.0989999994635582,
+        "endValue": 0.07800000160932541,
+        "useEndValue": 1,
+        "curveValue": -0.09000000357627869,
+        "useCurveValue": 1
+      },
+      "useMaxVelocity": 1,
+      "maxVelocity": {
+        "startValue": 1.850000023841858,
+        "endValue": 0.7099999785423279,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "influenceTarget": null,
+      "maxMoveSpeed": 20.0,
+      "maxRotationSpeed": 720.0,
+      "worldMoveInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "worldRotationInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "massInfluence": 0.0,
+      "windInfluence": 0.0,
+      "windRandomScale": 0.0,
+      "useDistanceDisable": 0,
+      "disableReferenceObject": null,
+      "disableDistance": 20.0,
+      "disableFadeDistance": 5.0,
+      "useResetTeleport": 0,
+      "teleportDistance": 0.20000000298023224,
+      "teleportRotation": 45.0,
+      "teleportMode": 0,
+      "resetStabilizationTime": 0.10000000149011612,
+      "useClampDistanceRatio": 1,
+      "clampDistanceMinRatio": 0.0,
+      "clampDistanceMaxRatio": 1.0,
+      "clampDistanceVelocityInfluence": 1.0,
+      "useClampPositionLength": 1,
+      "clampPositionLength": {
+        "startValue": 0.1940000057220459,
+        "endValue": 0.1940000057220459,
+        "useEndValue": 1,
+        "curveValue": -0.1899999976158142,
+        "useCurveValue": 1
+      },
+      "clampPositionRatioX": 1.0,
+      "clampPositionRatioY": 1.0,
+      "clampPositionRatioZ": 1.0,
+      "clampPositionVelocityInfluence": 1.0,
+      "clampPositionFrictionFactor": 1.0,
+      "useClampRotation": 0,
+      "clampRotationAngle": {
+        "startValue": 0.0,
+        "endValue": 67.0,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampRotationVelocityLimit": 1.0,
+      "clampRotationVelocityInfluence": 1.0,
+      "restoreDistanceVelocityInfluence": 1.0,
+      "structDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useBendDistance": 0,
+      "bendDistanceMaxCount": 6,
+      "bendDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useNearDistance": 0,
+      "nearDistanceMaxCount": 3,
+      "nearDistanceMaxDepth": 1.0,
+      "nearDistanceLength": {
+        "startValue": 0.21400000154972076,
+        "endValue": 0.05000000074505806,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "nearDistanceStiffness": {
+        "startValue": 0.30000001192092896,
+        "endValue": 0.30000001192092896,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useRestoreRotation": 1,
+      "restoreRotation": {
+        "startValue": 0.11699999868869781,
+        "endValue": 0.03799999877810478,
+        "useEndValue": 1,
+        "curveValue": 0.14000000059604645,
+        "useCurveValue": 1
+      },
+      "restoreRotationVelocityInfluence": 0.5,
+      "useSpring": 0,
+      "springPower": 0.017000000923871994,
+      "springRadius": 0.10000000149011612,
+      "springScaleX": 1.0,
+      "springScaleY": 1.0,
+      "springScaleZ": 1.0,
+      "springIntensity": 1.0,
+      "springDirectionAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.23399999737739563,
+        "useCurveValue": 1
+      },
+      "springDistanceAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.39500001072883606,
+        "useCurveValue": 1
+      },
+      "adjustMode": 0,
+      "adjustRotationPower": 5.0,
+      "useTriangleBend": 1,
+      "triangleBend": {
+        "startValue": 0.03200000151991844,
+        "endValue": 0.029999999329447746,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useVolume": 0,
+      "maxVolumeLength": 0.05000000074505806,
+      "volumeStretchStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "volumeShearStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useCollision": 1,
+      "friction": 0.0,
+      "staticFriction": 0.0,
+      "isThroat": 0,
+      "usePenetration": 0,
+      "penetrationMode": 1,
+      "penetrationAxis": 2,
+      "penetrationMaxDepth": 1.0,
+      "penetrationConnectDistance": {
+        "startValue": 0.0729999989271164,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationDistance": {
+        "startValue": 0.6159999966621399,
+        "endValue": 0.2800000011920929,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationRadius": {
+        "startValue": 0.5,
+        "endValue": 0.10999999940395355,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useLineAvarageRotation": 1,
+      "useFixedNonRotation": 1
+    },
+    "cullingMode": 100,
+    "clothTarget": {
+      "connection": 1,
+      "skipRestore": 1,
+      "isSkirt": 0,
+      "nonLoopMesh": 0,
+      "rootNameList": [
+        "R_HairE_Spo",
+        "C_HairD_Spo",
+        "L_HairE_Spo"
+      ],
+      "sameSurfaceAngle": 90.0
+    },
+    "colliders": [
+      "pelvis_CC",
+      "lThigh_CC",
+      "lCalf_CC",
+      "rThigh_CC",
+      "rCalf_CC",
+      "spine_CC",
+      "spine2_CC",
+      "spine3_CC",
+      "neck_CC",
+      "lUpperArm_CC",
+      "lForearm_CC",
+      "lHand_CC",
+      "rUpperArm_CC",
+      "rForearm_CC",
+      "rHand_CC",
+      "rFoot_CC",
+      "lFoot_CC",
+      "lBreastCapsule_CC",
+      "rBreastCapsule_CC",
+      "lAss_CC",
+      "rAss_CC",
+      "head_CC",
+      "nose_CC",
+      "spine4_CC"
+    ],
+    "particles": 32,
+    "fixed": 6,
+    "maxLevel": 11
+  },
+  "tifa:B_HairB": {
+    "clothParams": {
+      "radius": {
+        "startValue": 0.01600000075995922,
+        "endValue": 0.039000000804662704,
+        "useEndValue": 1,
+        "curveValue": 1.0,
+        "useCurveValue": 1
+      },
+      "mass": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useGravity": 1,
+      "gravity": {
+        "startValue": -10.0,
+        "endValue": -9.800000190734863,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "gravityDirection": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "useDrag": 1,
+      "drag": {
+        "startValue": 0.10000000149011612,
+        "endValue": 0.019999999552965164,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useMaxVelocity": 1,
+      "maxVelocity": {
+        "startValue": 1.2100000381469727,
+        "endValue": 3.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "influenceTarget": null,
+      "maxMoveSpeed": 20.0,
+      "maxRotationSpeed": 720.0,
+      "worldMoveInfluence": {
+        "startValue": 0.9710000157356262,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "worldRotationInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "massInfluence": 0.0,
+      "windInfluence": 0.0,
+      "windRandomScale": 0.0,
+      "useDistanceDisable": 0,
+      "disableReferenceObject": null,
+      "disableDistance": 20.0,
+      "disableFadeDistance": 5.0,
+      "useResetTeleport": 0,
+      "teleportDistance": 0.20000000298023224,
+      "teleportRotation": 45.0,
+      "teleportMode": 0,
+      "resetStabilizationTime": 0.10000000149011612,
+      "useClampDistanceRatio": 1,
+      "clampDistanceMinRatio": 0.0,
+      "clampDistanceMaxRatio": 1.0,
+      "clampDistanceVelocityInfluence": 1.0,
+      "useClampPositionLength": 1,
+      "clampPositionLength": {
+        "startValue": 0.0,
+        "endValue": 0.2280000001192093,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampPositionRatioX": 1.0,
+      "clampPositionRatioY": 1.0,
+      "clampPositionRatioZ": 1.0,
+      "clampPositionVelocityInfluence": 1.0,
+      "clampPositionFrictionFactor": 1.0,
+      "useClampRotation": 0,
+      "clampRotationAngle": {
+        "startValue": 0.0,
+        "endValue": 18.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampRotationVelocityLimit": 2.0,
+      "clampRotationVelocityInfluence": 0.0,
+      "restoreDistanceVelocityInfluence": 1.0,
+      "structDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useBendDistance": 0,
+      "bendDistanceMaxCount": 6,
+      "bendDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useNearDistance": 0,
+      "nearDistanceMaxCount": 3,
+      "nearDistanceMaxDepth": 1.0,
+      "nearDistanceLength": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.05000000074505806,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "nearDistanceStiffness": {
+        "startValue": 0.30000001192092896,
+        "endValue": 0.30000001192092896,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useRestoreRotation": 1,
+      "restoreRotation": {
+        "startValue": 0.014000000432133675,
+        "endValue": 0.09399999678134918,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "restoreRotationVelocityInfluence": 0.5,
+      "useSpring": 0,
+      "springPower": 0.017000000923871994,
+      "springRadius": 0.10000000149011612,
+      "springScaleX": 1.0,
+      "springScaleY": 1.0,
+      "springScaleZ": 1.0,
+      "springIntensity": 1.0,
+      "springDirectionAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.23399999737739563,
+        "useCurveValue": 1
+      },
+      "springDistanceAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.39500001072883606,
+        "useCurveValue": 1
+      },
+      "adjustMode": 0,
+      "adjustRotationPower": 5.0,
+      "useTriangleBend": 0,
+      "triangleBend": {
+        "startValue": 0.029999999329447746,
+        "endValue": 0.029999999329447746,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useVolume": 0,
+      "maxVolumeLength": 0.05000000074505806,
+      "volumeStretchStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "volumeShearStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useCollision": 1,
+      "friction": 0.0,
+      "staticFriction": 0.0,
+      "isThroat": 0,
+      "usePenetration": 0,
+      "penetrationMode": 0,
+      "penetrationAxis": 2,
+      "penetrationMaxDepth": 1.0,
+      "penetrationConnectDistance": {
+        "startValue": 0.10000000149011612,
+        "endValue": 0.20000000298023224,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationDistance": {
+        "startValue": 1.0,
+        "endValue": 0.2800000011920929,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationRadius": {
+        "startValue": 0.5,
+        "endValue": 0.10999999940395355,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useLineAvarageRotation": 1,
+      "useFixedNonRotation": 1
+    },
+    "cullingMode": 100,
+    "clothTarget": {
+      "connection": 1,
+      "skipRestore": 0,
+      "isSkirt": 0,
+      "nonLoopMesh": 0,
+      "rootNameList": [
+        "R_HairB_a_Phy",
+        "R_HairC_a_Phy",
+        "R_HairD_a_Phy"
+      ],
+      "sameSurfaceAngle": 90.0
+    },
+    "colliders": [
+      "neck_CC",
+      "spine4_CC",
+      "spine3_CC",
+      "lUpperArm_CC",
+      "rUpperArm_CC",
+      "head_CC",
+      "nose_CC"
+    ],
+    "particles": 21,
+    "fixed": 3,
+    "maxLevel": 7
+  },
+  "tifa:B_Earrings": {
+    "clothParams": {
+      "radius": {
+        "startValue": 0.012000000104308128,
+        "endValue": 0.06800000369548798,
+        "useEndValue": 1,
+        "curveValue": -0.49000000953674316,
+        "useCurveValue": 0
+      },
+      "mass": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useGravity": 1,
+      "gravity": {
+        "startValue": -10.0,
+        "endValue": -9.800000190734863,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "gravityDirection": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "useDrag": 1,
+      "drag": {
+        "startValue": 0.01600000075995922,
+        "endValue": 0.019999999552965164,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useMaxVelocity": 1,
+      "maxVelocity": {
+        "startValue": 0.6000000238418579,
+        "endValue": 3.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "influenceTarget": null,
+      "maxMoveSpeed": 20.0,
+      "maxRotationSpeed": 720.0,
+      "worldMoveInfluence": {
+        "startValue": 0.9710000157356262,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "worldRotationInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "massInfluence": 0.0,
+      "windInfluence": 0.0,
+      "windRandomScale": 0.0,
+      "useDistanceDisable": 0,
+      "disableReferenceObject": null,
+      "disableDistance": 20.0,
+      "disableFadeDistance": 5.0,
+      "useResetTeleport": 0,
+      "teleportDistance": 0.20000000298023224,
+      "teleportRotation": 45.0,
+      "teleportMode": 0,
+      "resetStabilizationTime": 0.10000000149011612,
+      "useClampDistanceRatio": 1,
+      "clampDistanceMinRatio": 0.0,
+      "clampDistanceMaxRatio": 2.0,
+      "clampDistanceVelocityInfluence": 1.0,
+      "useClampPositionLength": 1,
+      "clampPositionLength": {
+        "startValue": 0.0,
+        "endValue": 0.4099999964237213,
+        "useEndValue": 1,
+        "curveValue": 0.9300000071525574,
+        "useCurveValue": 1
+      },
+      "clampPositionRatioX": 1.0,
+      "clampPositionRatioY": 1.0,
+      "clampPositionRatioZ": 1.0,
+      "clampPositionVelocityInfluence": 1.0,
+      "clampPositionFrictionFactor": 1.0,
+      "useClampRotation": 0,
+      "clampRotationAngle": {
+        "startValue": 25.0,
+        "endValue": 30.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampRotationVelocityLimit": 1.0,
+      "clampRotationVelocityInfluence": 1.0,
+      "restoreDistanceVelocityInfluence": 1.0,
+      "structDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useBendDistance": 0,
+      "bendDistanceMaxCount": 6,
+      "bendDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useNearDistance": 0,
+      "nearDistanceMaxCount": 3,
+      "nearDistanceMaxDepth": 1.0,
+      "nearDistanceLength": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.05000000074505806,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "nearDistanceStiffness": {
+        "startValue": 0.30000001192092896,
+        "endValue": 0.30000001192092896,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useRestoreRotation": 0,
+      "restoreRotation": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.0,
+        "useEndValue": 0,
+        "curveValue": -0.4000000059604645,
+        "useCurveValue": 0
+      },
+      "restoreRotationVelocityInfluence": 1.0,
+      "useSpring": 0,
+      "springPower": 0.017000000923871994,
+      "springRadius": 0.10000000149011612,
+      "springScaleX": 1.0,
+      "springScaleY": 1.0,
+      "springScaleZ": 1.0,
+      "springIntensity": 1.0,
+      "springDirectionAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.23399999737739563,
+        "useCurveValue": 1
+      },
+      "springDistanceAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.39500001072883606,
+        "useCurveValue": 1
+      },
+      "adjustMode": 0,
+      "adjustRotationPower": 5.0,
+      "useTriangleBend": 0,
+      "triangleBend": {
+        "startValue": 0.029999999329447746,
+        "endValue": 0.029999999329447746,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useVolume": 0,
+      "maxVolumeLength": 0.05000000074505806,
+      "volumeStretchStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "volumeShearStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useCollision": 1,
+      "friction": 0.0,
+      "staticFriction": 0.0,
+      "isThroat": 0,
+      "usePenetration": 0,
+      "penetrationMode": 1,
+      "penetrationAxis": 2,
+      "penetrationMaxDepth": 1.0,
+      "penetrationConnectDistance": {
+        "startValue": 1.0,
+        "endValue": 0.20000000298023224,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationDistance": {
+        "startValue": 0.0,
+        "endValue": 0.2800000011920929,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationRadius": {
+        "startValue": 0.0,
+        "endValue": 0.10999999940395355,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useLineAvarageRotation": 0,
+      "useFixedNonRotation": 0
+    },
+    "cullingMode": 0,
+    "clothTarget": {
+      "connection": 0,
+      "skipRestore": 0,
+      "isSkirt": 0,
+      "nonLoopMesh": 0,
+      "rootNameList": [
+        "L_Earring_a_Phy"
+      ],
+      "sameSurfaceAngle": 45.900001525878906
+    },
+    "colliders": [
+      "lThigh_CC",
+      "rThigh_CC",
+      "lAss_CC",
+      "rAss_CC",
+      "pelvis_CC"
+    ],
+    "particles": 4,
+    "fixed": 1,
+    "maxLevel": 4
+  },
+  "tifa:B_Skirt": {
+    "clothParams": {
+      "radius": {
+        "startValue": 0.014000000432133675,
+        "endValue": 0.03700000047683716,
+        "useEndValue": 0,
+        "curveValue": -0.49000000953674316,
+        "useCurveValue": 0
+      },
+      "mass": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useGravity": 1,
+      "gravity": {
+        "startValue": -10.0,
+        "endValue": -9.800000190734863,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "gravityDirection": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "useDrag": 1,
+      "drag": {
+        "startValue": 0.01899999938905239,
+        "endValue": 0.019999999552965164,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useMaxVelocity": 1,
+      "maxVelocity": {
+        "startValue": 0.23000000417232513,
+        "endValue": 3.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "influenceTarget": null,
+      "maxMoveSpeed": 20.0,
+      "maxRotationSpeed": 720.0,
+      "worldMoveInfluence": {
+        "startValue": 0.9710000157356262,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "worldRotationInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "massInfluence": 0.0,
+      "windInfluence": 0.0,
+      "windRandomScale": 0.0,
+      "useDistanceDisable": 0,
+      "disableReferenceObject": null,
+      "disableDistance": 20.0,
+      "disableFadeDistance": 5.0,
+      "useResetTeleport": 0,
+      "teleportDistance": 0.20000000298023224,
+      "teleportRotation": 45.0,
+      "teleportMode": 0,
+      "resetStabilizationTime": 0.10000000149011612,
+      "useClampDistanceRatio": 1,
+      "clampDistanceMinRatio": 0.0,
+      "clampDistanceMaxRatio": 1.0,
+      "clampDistanceVelocityInfluence": 1.0,
+      "useClampPositionLength": 1,
+      "clampPositionLength": {
+        "startValue": 0.0,
+        "endValue": 0.03099999949336052,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 1
+      },
+      "clampPositionRatioX": 1.0,
+      "clampPositionRatioY": 1.0,
+      "clampPositionRatioZ": 1.0,
+      "clampPositionVelocityInfluence": 1.0,
+      "clampPositionFrictionFactor": 1.0,
+      "useClampRotation": 0,
+      "clampRotationAngle": {
+        "startValue": 25.0,
+        "endValue": 30.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampRotationVelocityLimit": 1.0,
+      "clampRotationVelocityInfluence": 1.0,
+      "restoreDistanceVelocityInfluence": 1.0,
+      "structDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useBendDistance": 0,
+      "bendDistanceMaxCount": 6,
+      "bendDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useNearDistance": 0,
+      "nearDistanceMaxCount": 3,
+      "nearDistanceMaxDepth": 1.0,
+      "nearDistanceLength": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.05000000074505806,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "nearDistanceStiffness": {
+        "startValue": 0.30000001192092896,
+        "endValue": 0.30000001192092896,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useRestoreRotation": 0,
+      "restoreRotation": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.0,
+        "useEndValue": 0,
+        "curveValue": -0.4000000059604645,
+        "useCurveValue": 0
+      },
+      "restoreRotationVelocityInfluence": 1.0,
+      "useSpring": 0,
+      "springPower": 0.017000000923871994,
+      "springRadius": 0.10000000149011612,
+      "springScaleX": 1.0,
+      "springScaleY": 1.0,
+      "springScaleZ": 1.0,
+      "springIntensity": 1.0,
+      "springDirectionAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.23399999737739563,
+        "useCurveValue": 1
+      },
+      "springDistanceAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.39500001072883606,
+        "useCurveValue": 1
+      },
+      "adjustMode": 0,
+      "adjustRotationPower": 5.0,
+      "useTriangleBend": 0,
+      "triangleBend": {
+        "startValue": 0.029999999329447746,
+        "endValue": 0.029999999329447746,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useVolume": 0,
+      "maxVolumeLength": 0.05000000074505806,
+      "volumeStretchStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "volumeShearStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useCollision": 1,
+      "friction": 0.0,
+      "staticFriction": 0.0,
+      "isThroat": 0,
+      "usePenetration": 0,
+      "penetrationMode": 1,
+      "penetrationAxis": 2,
+      "penetrationMaxDepth": 1.0,
+      "penetrationConnectDistance": {
+        "startValue": 1.0,
+        "endValue": 0.20000000298023224,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationDistance": {
+        "startValue": 0.0,
+        "endValue": 0.2800000011920929,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationRadius": {
+        "startValue": 0.0,
+        "endValue": 0.10999999940395355,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useLineAvarageRotation": 0,
+      "useFixedNonRotation": 0
+    },
+    "cullingMode": 100,
+    "clothTarget": {
+      "connection": 0,
+      "skipRestore": 1,
+      "isSkirt": 1,
+      "nonLoopMesh": 0,
+      "rootNameList": [
+        "C_SkirtA_Spo",
+        "C_SkirtB_Spo",
+        "L_SkirtA_Spo",
+        "L_SkirtB_Spo",
+        "L_SkirtC_Spo",
+        "L_SkirtD_Spo",
+        "R_SkirtA_Spo",
+        "R_SkirtB_Spo",
+        "R_SkirtC_Spo",
+        "R_SkirtD_Spo"
+      ],
+      "sameSurfaceAngle": 90.0
+    },
+    "colliders": [
+      "lThigh_CC",
+      "rThigh_CC",
+      "lAss_CC",
+      "rAss_CC",
+      "pelvis_CC",
+      "spine_CC"
+    ],
+    "particles": 50,
+    "fixed": 20,
+    "maxLevel": 4
+  },
+  "tifa:B_Hair": {
+    "clothParams": {
+      "radius": {
+        "startValue": 0.013000000268220901,
+        "endValue": 0.017999999225139618,
+        "useEndValue": 1,
+        "curveValue": 1.0,
+        "useCurveValue": 0
+      },
+      "mass": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useGravity": 1,
+      "gravity": {
+        "startValue": -10.0,
+        "endValue": -9.800000190734863,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "gravityDirection": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "useDrag": 1,
+      "drag": {
+        "startValue": 0.035999998450279236,
+        "endValue": 0.019999999552965164,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useMaxVelocity": 1,
+      "maxVelocity": {
+        "startValue": 0.11999999731779099,
+        "endValue": 3.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "influenceTarget": null,
+      "maxMoveSpeed": 20.0,
+      "maxRotationSpeed": 720.0,
+      "worldMoveInfluence": {
+        "startValue": 0.9710000157356262,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "worldRotationInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "massInfluence": 0.0,
+      "windInfluence": 0.0,
+      "windRandomScale": 0.0,
+      "useDistanceDisable": 0,
+      "disableReferenceObject": null,
+      "disableDistance": 20.0,
+      "disableFadeDistance": 5.0,
+      "useResetTeleport": 0,
+      "teleportDistance": 0.20000000298023224,
+      "teleportRotation": 45.0,
+      "teleportMode": 0,
+      "resetStabilizationTime": 0.10000000149011612,
+      "useClampDistanceRatio": 1,
+      "clampDistanceMinRatio": 0.0,
+      "clampDistanceMaxRatio": 1.0,
+      "clampDistanceVelocityInfluence": 1.0,
+      "useClampPositionLength": 0,
+      "clampPositionLength": {
+        "startValue": 0.0,
+        "endValue": 0.25999999046325684,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampPositionRatioX": 1.0,
+      "clampPositionRatioY": 1.0,
+      "clampPositionRatioZ": 1.0,
+      "clampPositionVelocityInfluence": 0.0,
+      "clampPositionFrictionFactor": 1.0,
+      "useClampRotation": 0,
+      "clampRotationAngle": {
+        "startValue": 0.0,
+        "endValue": 18.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampRotationVelocityLimit": 2.0,
+      "clampRotationVelocityInfluence": 0.0,
+      "restoreDistanceVelocityInfluence": 1.0,
+      "structDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useBendDistance": 0,
+      "bendDistanceMaxCount": 6,
+      "bendDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useNearDistance": 0,
+      "nearDistanceMaxCount": 3,
+      "nearDistanceMaxDepth": 1.0,
+      "nearDistanceLength": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.05000000074505806,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "nearDistanceStiffness": {
+        "startValue": 0.30000001192092896,
+        "endValue": 0.30000001192092896,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useRestoreRotation": 1,
+      "restoreRotation": {
+        "startValue": 0.35499998927116394,
+        "endValue": 0.10199999809265137,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "restoreRotationVelocityInfluence": 0.5,
+      "useSpring": 0,
+      "springPower": 0.017000000923871994,
+      "springRadius": 0.10000000149011612,
+      "springScaleX": 1.0,
+      "springScaleY": 1.0,
+      "springScaleZ": 1.0,
+      "springIntensity": 1.0,
+      "springDirectionAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.23399999737739563,
+        "useCurveValue": 1
+      },
+      "springDistanceAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.39500001072883606,
+        "useCurveValue": 1
+      },
+      "adjustMode": 0,
+      "adjustRotationPower": 5.0,
+      "useTriangleBend": 0,
+      "triangleBend": {
+        "startValue": 0.029999999329447746,
+        "endValue": 0.029999999329447746,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useVolume": 0,
+      "maxVolumeLength": 0.05000000074505806,
+      "volumeStretchStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "volumeShearStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useCollision": 1,
+      "friction": 0.0,
+      "staticFriction": 0.0,
+      "isThroat": 0,
+      "usePenetration": 0,
+      "penetrationMode": 0,
+      "penetrationAxis": 2,
+      "penetrationMaxDepth": 1.0,
+      "penetrationConnectDistance": {
+        "startValue": 0.10000000149011612,
+        "endValue": 0.20000000298023224,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationDistance": {
+        "startValue": 1.0,
+        "endValue": 0.2800000011920929,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationRadius": {
+        "startValue": 0.5,
+        "endValue": 0.10999999940395355,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useLineAvarageRotation": 1,
+      "useFixedNonRotation": 0
+    },
+    "cullingMode": 100,
+    "clothTarget": {
+      "connection": 0,
+      "skipRestore": 0,
+      "isSkirt": 0,
+      "nonLoopMesh": 0,
+      "rootNameList": [
+        "C_HairA_a_Phy",
+        "C_HairB_a_Phy",
+        "C_HairC_a_Phy",
+        "L_HairA_a_Phy",
+        "L_HairB_a_Phy",
+        "L_HairC_a_Phy",
+        "L_HairD_a_Phy",
+        "R_HairF_a_Phy",
+        "R_HairG_a_Phy",
+        "R_HairA_a_Phy"
+      ],
+      "sameSurfaceAngle": 80.0
+    },
+    "colliders": [
+      "neck_CC",
+      "spine4_CC",
+      "spine3_CC",
+      "head_CC",
+      "nose_CC"
+    ],
+    "particles": 43,
+    "fixed": 10,
+    "maxLevel": 5
+  },
+  "tifa:B_Belts": {
+    "clothParams": {
+      "radius": {
+        "startValue": 0.012000000104308128,
+        "endValue": 0.06800000369548798,
+        "useEndValue": 1,
+        "curveValue": -0.49000000953674316,
+        "useCurveValue": 0
+      },
+      "mass": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useGravity": 1,
+      "gravity": {
+        "startValue": -10.0,
+        "endValue": -9.800000190734863,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "gravityDirection": {
+        "x": 0.0,
+        "y": 1.0,
+        "z": 0.0
+      },
+      "useDrag": 1,
+      "drag": {
+        "startValue": 0.00800000037997961,
+        "endValue": 0.019999999552965164,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useMaxVelocity": 1,
+      "maxVelocity": {
+        "startValue": 0.6000000238418579,
+        "endValue": 3.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "influenceTarget": null,
+      "maxMoveSpeed": 20.0,
+      "maxRotationSpeed": 720.0,
+      "worldMoveInfluence": {
+        "startValue": 0.9710000157356262,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "worldRotationInfluence": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "massInfluence": 0.0,
+      "windInfluence": 0.0,
+      "windRandomScale": 0.0,
+      "useDistanceDisable": 0,
+      "disableReferenceObject": null,
+      "disableDistance": 20.0,
+      "disableFadeDistance": 5.0,
+      "useResetTeleport": 0,
+      "teleportDistance": 0.20000000298023224,
+      "teleportRotation": 45.0,
+      "teleportMode": 0,
+      "resetStabilizationTime": 0.10000000149011612,
+      "useClampDistanceRatio": 1,
+      "clampDistanceMinRatio": 0.0,
+      "clampDistanceMaxRatio": 2.0,
+      "clampDistanceVelocityInfluence": 1.0,
+      "useClampPositionLength": 1,
+      "clampPositionLength": {
+        "startValue": 0.0,
+        "endValue": 0.4099999964237213,
+        "useEndValue": 1,
+        "curveValue": 0.9300000071525574,
+        "useCurveValue": 1
+      },
+      "clampPositionRatioX": 1.0,
+      "clampPositionRatioY": 1.0,
+      "clampPositionRatioZ": 1.0,
+      "clampPositionVelocityInfluence": 1.0,
+      "clampPositionFrictionFactor": 1.0,
+      "useClampRotation": 0,
+      "clampRotationAngle": {
+        "startValue": 25.0,
+        "endValue": 30.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "clampRotationVelocityLimit": 1.0,
+      "clampRotationVelocityInfluence": 1.0,
+      "restoreDistanceVelocityInfluence": 1.0,
+      "structDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 1.0,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useBendDistance": 0,
+      "bendDistanceMaxCount": 6,
+      "bendDistanceStiffness": {
+        "startValue": 1.0,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useNearDistance": 0,
+      "nearDistanceMaxCount": 3,
+      "nearDistanceMaxDepth": 1.0,
+      "nearDistanceLength": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.05000000074505806,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "nearDistanceStiffness": {
+        "startValue": 0.30000001192092896,
+        "endValue": 0.30000001192092896,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useRestoreRotation": 0,
+      "restoreRotation": {
+        "startValue": 0.05000000074505806,
+        "endValue": 0.0,
+        "useEndValue": 0,
+        "curveValue": -0.4000000059604645,
+        "useCurveValue": 0
+      },
+      "restoreRotationVelocityInfluence": 1.0,
+      "useSpring": 0,
+      "springPower": 0.017000000923871994,
+      "springRadius": 0.10000000149011612,
+      "springScaleX": 1.0,
+      "springScaleY": 1.0,
+      "springScaleZ": 1.0,
+      "springIntensity": 1.0,
+      "springDirectionAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.23399999737739563,
+        "useCurveValue": 1
+      },
+      "springDistanceAtten": {
+        "startValue": 1.0,
+        "endValue": 0.0,
+        "useEndValue": 1,
+        "curveValue": 0.39500001072883606,
+        "useCurveValue": 1
+      },
+      "adjustMode": 0,
+      "adjustRotationPower": 5.0,
+      "useTriangleBend": 0,
+      "triangleBend": {
+        "startValue": 0.029999999329447746,
+        "endValue": 0.029999999329447746,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useVolume": 0,
+      "maxVolumeLength": 0.05000000074505806,
+      "volumeStretchStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 1,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "volumeShearStiffness": {
+        "startValue": 0.5,
+        "endValue": 0.5,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useCollision": 1,
+      "friction": 0.0,
+      "staticFriction": 0.0,
+      "isThroat": 0,
+      "usePenetration": 0,
+      "penetrationMode": 1,
+      "penetrationAxis": 2,
+      "penetrationMaxDepth": 1.0,
+      "penetrationConnectDistance": {
+        "startValue": 1.0,
+        "endValue": 0.20000000298023224,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationDistance": {
+        "startValue": 0.0,
+        "endValue": 0.2800000011920929,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "penetrationRadius": {
+        "startValue": 0.0,
+        "endValue": 0.10999999940395355,
+        "useEndValue": 0,
+        "curveValue": 0.0,
+        "useCurveValue": 0
+      },
+      "useLineAvarageRotation": 0,
+      "useFixedNonRotation": 0
+    },
+    "cullingMode": 0,
+    "clothTarget": {
+      "connection": 0,
+      "skipRestore": 1,
+      "isSkirt": 0,
+      "nonLoopMesh": 0,
+      "rootNameList": [
+        "L_BeltA_Spo",
+        "L_BeltB_Spo",
+        "R_BeltA_Spo",
+        "R_BeltB_Spo"
+      ],
+      "sameSurfaceAngle": 45.900001525878906
+    },
+    "colliders": [
+      "lThigh_CC",
+      "rThigh_CC",
+      "lAss_CC",
+      "rAss_CC",
+      "pelvis_CC"
+    ],
+    "particles": 24,
+    "fixed": 8,
+    "maxLevel": 5
+  }
+}
 PS D:\TFA\tfa-character-import-toolsets_v1.2\tfa-character-import-toolsets>
