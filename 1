@@ -1,959 +1,727 @@
-PS D:\TFA\tfa-character-import-toolsets_v1.2\tfa-character-import-toolsets> Select-String -Path "references\00-new-model-playbook.md","references\00d-cookbook.md" -Pattern "S11|S12|soft.tissue|soft tissue|cloth|voice_dir|voice" -Context 5,12
-
-  references\00-new-model-playbook.md:21:`Game.LoadHuman` with 0 Unity errors; real-use batches in `<WORK_DIR>/proof/in
-game_serve/m18_night/` (PROGRESS C17–C18).
-  references\00-new-model-playbook.md:22:m19 (= m18 + the user-supplied penis asset fused into her skin, `futa_npz` + `
-tex_dirs`; 353 MB) assembled,
-  references\00-new-model-playbook.md:23:fusion renders ok (6 views), Unity lab verify rc 0,  with a backup of m18 (`ow
-n/logs/m19_finish.log`);
-  references\00-new-model-playbook.md:24:in-game proof pending. Open items: §8.
-  references\00-new-model-playbook.md:25:Update 2026-10-18: m19c installed 2026-10-16 (patch + collision renderers disa
-bled, `Colliders` tagged, penis layers,
-> references\00-new-model-playbook.md:26:cloth cull lists, body tints — the fulldiff findings, 00a §D); the user upda
-ted the game in place to **0.5991**
-  references\00-new-model-playbook.md:27:(`ga:5e82b424`) on 2026-10-17 — every address in the references belongs to 0.
-59 (`ga:f61c0f80`) until re-verified (§10).
-  references\00-new-model-playbook.md:28:
-  references\00-new-model-playbook.md:29:Placeholders: `<Model>` = the source objects' prefix and display name (`Shion`
-), `<model>` = lower-case file prefix
-  references\00-new-model-playbook.md:30:(`shion`), `<stem>` = `.tfa` stem = in-game name (`shion`), `<Arm>` = source a
-rmature (`RIG-Shion`), `mNN` = build
-  references\00-new-model-playbook.md:31:number, `<tag>` = an asset/bake tag. Shell prelude as in the resume scripts (G
-it Bash). Every path contains a space
-  references\00-new-model-playbook.md:32:(a folder name with a space): always quote it, and call the lock tool through
-a function, never through an unquoted variable
-  references\00-new-model-playbook.md:33:(pitfall E16 — reproduced 2026-10-16):
-  references\00-new-model-playbook.md:34:
-  references\00-new-model-playbook.md:35:```bash
-  references\00-new-model-playbook.md:36:G="<GAME_DIR>"; SK="$G/.agents/skills/tfa-character-import"; D="$SK/data"
-  references\00-new-model-playbook.md:37:B="$G/<model>_build"; O="$B/own"                       # the case-study model:
- B=the work folder, O=<WORK_DIR>/own (subdivided: own_v2)
-  references\00-new-model-playbook.md:38:BL="<BLENDER>"
-  references\00-new-model-playbook.md:42:
-  references\00-new-model-playbook.md:43:
-  references\00-new-model-playbook.md:44:## READ FIRST: the 18 lessons that cost the case-study model import the most t
-okens (2026-10-26)
-  references\00-new-model-playbook.md:45:1. The game DROPS prefab blend-shape weights and copies Body_'s weights onto e
-very garment by name each frame. Every shape that must be on
-  references\00-new-model-playbook.md:46:   (body fit, breast rest) needs a Customize curve on Body_ in every Outfit op
-tion. Every garment-only key (Fit_Over_*, SuitFit_*) needs a
-> references\00-new-model-playbook.md:47:   zero-delta Body_ shape of the same name with its curve on Body_. Missing th
-is made all clothing look torn in game for days (L81).
-  references\00-new-model-playbook.md:48:2. Judge looks IN GAME (test rig + harness), never by lab render alone: the la
-b keeps prefab weights, skips the game's push/hide and uses
-  references\00-new-model-playbook.md:49:   other light. Before any install: build ok, crumple_hard, an in-game shot of
- the default look, rig smoke (L76, CLAUDE.md rule 3).
-  references\00-new-model-playbook.md:50:3. Capture in the photo studio with ALL its lights set to normal (plus a brigh
-t and a dim pass), never only the bright default. In penetration
-  references\00-new-model-playbook.md:51:   shots hide the partner's body and keep the penis visible (L82).
-  references\00-new-model-playbook.md:52:4. Blender assets first: the fresh Blender bakes were identical to the shipped
- textures, so re-grading skin colour only added drift.
-  references\00-new-model-playbook.md:53:   Fix the in-game look with material and light calibration against the refere
-nce sheets, not by repainting the texture.
-  references\00-new-model-playbook.md:54:5. A clip solve must never write a whole look's retraction into every item key
- (the suit exploded 15x). Dedup is in the chain now (GF20).
-  references\00-new-model-playbook.md:55:6. One kind of change per build, so a regression is attributable.
-  references\00-new-model-playbook.md:56:7. Test only the installed build or the one candidate. Reset own/rig_test_requ
-est.txt at every install (CLAUDE.md rule 7).
-  references\00-new-model-playbook.md:57:8. Memory: assemblies (MEMORY_RESERVED) block rig starts. Never schedule an as
-sembly while rig work is queued. Headroom uses fixed caps
-  references\00-new-model-playbook.md:58:   (memwait 62 GB, C: >= 8 GB), never the growing page-file limit (L72, L74).
-  references\00-new-model-playbook.md:59:9. Perf rows need a quiet machine. Core pinning does NOT work: the game's moti
-on threads collapse on half the cores.
-  references\00-new-model-playbook.md:81:  Write new files only; replacing our own `Mods/Characters/<stem>.tfa` is the
-normal update path (keep a backup of
-  references\00-new-model-playbook.md:82:  the installed file, as `build_m19_chain.sh` does).
-  references\00-new-model-playbook.md:83:* **Own character; borrowing shipped content allowed for local builds** (3x, A
-GENT_BRIEF §1:
-  references\00-new-model-playbook.md:84:  "steal textures and decomp and get the shaders and models and everything fro
-m all tfa but you still need to make your
-  references\00-new-model-playbook.md:85:  own custom stuff"). Shipped `.tfa` textures, material values, shaders, mesh
-construction (holes, mouth, throat,
-> references\00-new-model-playbook.md:86:  patches) and cloth/collider parameters may be extracted (copies only, never
-modify a shipped file) and reused or
-  references\00-new-model-playbook.md:87:  adapted; the character stays her own (body, face, rig, outfits come from the
- model). **Extracted game content and
-  references\00-new-model-playbook.md:88:  decompiled game code stay out of the open-source toolset**: store them under
- `<RESEARCH_DIR>/` or
-  references\00-new-model-playbook.md:89:  `<SHIPPED_LIB_DIR>/`, never under `.agents/skills/...` (00c §9). Older rule
-, still the default for per-character
-  references\00-new-model-playbook.md:90:  values: every mesh, texture, weight, clip and per-character value comes from
- the model or from our generators.
-  references\00-new-model-playbook.md:91:  Exceptions documented before the borrowing rule = game data that is identica
-l in every shipped character: `data/face_control_clips.json` (29 face-control clips, ref 19 §18),
-> references\00-new-model-playbook.md:92:  `data/cloth_param_profiles.json` / bone-cloth profiles (`own_bonecloth.extra
-ct_profiles` -> a local file outside the toolset, e.g. `<SHIPPED_LIB_DIR>/_bonecloth/bonecloth_param_profiles.json`) (t
-he game's cloth parameter sets, ref 19 §7,
-  references\00-new-model-playbook.md:93:  ref 23 §5), `data/class_defaults.json` (constructor defaults), the shipped
-`bodyVertToFullVertIds` table used only as
-  references\00-new-model-playbook.md:94:  an address table by `own_canonical_map.py`. User-granted exceptions: vulva/a
-nus/canal texture detail may borrow from
-  references\00-new-model-playbook.md:95:  shipped bodies; user-supplied models in `3d_model/` may be used.
-  references\00-new-model-playbook.md:96:* **Untrusted files.** A downloaded `.blend` (the model and every asset in `3d
-_model/`) opens with `blender -b -Y`
-  references\00-new-model-playbook.md:97:  (auto-run scripts off). Read the embedded texts listed by `blend_inventory.p
-y` before deciding anything else. Proof
-  references\00-new-model-playbook.md:98:  renders that only need our npz/png data run with `--factory-startup` and no
-`.blend` (`render_futa_fusion.py`).
-  references\00-new-model-playbook.md:99:  Python that parses extracted data runs with `py -3 -I`. The case-study model
- chains used `-y` on `stage2*.blend` (a copy of the
-  references\00-new-model-playbook.md:100:  downloaded file); do not repeat that by default — pitfall X1.
-  references\00-new-model-playbook.md:101:* **Proof for everything** (numbers, renders, in-game shots under `<B>/proof/
-`), and prove an artefact changed
-  references\00-new-model-playbook.md:102:  (mtime/md5) before testing it.
-  references\00-new-model-playbook.md:103:* **One Blender, one Unity batch, one Ghidra, one game** at a time (the avail
-able RAM) — `lockfile.py` (§7).
-  references\00-new-model-playbook.md:104:* **Test like real use** (§6), never only a T-pose. **Same as Blender, no mo
-rphing**: native size, own proportions,
-  references\00-new-model-playbook.md:129:| body cfg | `data/shion_body_cfg_v2.json` → template `data/template_body_cf
-g.json` | paths, UDIM slots / atlas grid, shape keys, region thresholds, skin map, fit/face keys |
-  references\00-new-model-playbook.md:130:| face rig profile | `data/face_rig_profile_shion.json` | bones + controls +
-the rig's own expression actions (hand-written from the inventory) |
-  references\00-new-model-playbook.md:131:| outfit presets | `data/shion_outfit_presets.json` | slots → options = rig
-property overrides; objects; fit keys |
-  references\00-new-model-playbook.md:132:| bake jobs | `<WORK_DIR>/own/bake_jobs.txt` (`<size> <tag> <object>` per lin
-e) | one line per non-body object |
-  references\00-new-model-playbook.md:133:| assemble cfg | `data/shion_assemble_m19_cfg.json` → template `data/templat
-e_assemble_cfg.json` | extras, slots, switches, overrides, material tuning |
-> references\00-new-model-playbook.md:134:| voice files (optional) | `<WORK_DIR>/own/voice/src/<Category>/…` | user-su
-pplied; categories Pleasure/Pain/Like/Dislike/Greeting/Breath (ref 24) |
-  references\00-new-model-playbook.md:135:| portrait (optional) | `Mods/Portraits/shion.png` | shown in the character s
-elect by the TfaPortraits plugin (S16) |
-  references\00-new-model-playbook.md:136:| reference characters | clean 0.5991 install `Mods/Characters/{succubus,quee
-n,primrose,primrose office,akali,generic male}.tfa` | official = developer conventions; the modded install's copies of
-several are older versions (AGENT_BRIEF §21, 00a GV4) — record which copy (sha256) a diff used |
-  references\00-new-model-playbook.md:137:| benchmark pair (S18) | `3d_model/Character_original_model/<package>` + the
-clean shipped `.tfa` | 18 pairs (00c §6); source packages are commercial third-party files: local use only |
-  references\00-new-model-playbook.md:138:
-  references\00-new-model-playbook.md:139:## 3. Build directory (what the stages write)
-  references\00-new-model-playbook.md:140:```
-  references\00-new-model-playbook.md:141:<B>/stage2.json  stage2.blend  stage2_report.json  stage2_front.png  stage2_s
-ide.png
-  references\00-new-model-playbook.md:142:<B>/export/      BAKED_*.npz + manifest.json + keys/<obj>_keys.npz      (the
-case-study model v1: shion_export/, v2: own_v2/export/)
-  references\00-new-model-playbook.md:143:<O>/             frames/ skeleton.json body_mesh.npz body_report.json holes_g
-eometry.json futa_piece.npz
-  references\00-new-model-playbook.md:144:                 face_pose_sim.json head_report_native.json outfit_switches.j
-son suit_shell.npz canonical_map.npz
-  references\00-new-model-playbook.md:145:                 bake/ tex/ logs/ assemble_report.json blend_inventory.{json,
-md} baked_objects.txt bake_jobs.txt
-  references\00-new-model-playbook.md:146:<O>/assets/<tag>/  exported user asset (asset.npz/json, bakes, state renders)
-    <O>/futa_ur/  fused futa piece
-> references\00-new-model-playbook.md:147:<O>/tex_mNN/     per-build texture overrides (assemble cfg tex_dirs)
- <O>/voice/{src,out}/  voice drop folder / built clips
-> references\00-new-model-playbook.md:148:<O>/bonecloth/   bone-cloth data + INTEGRATION.md (agent)
- <O>/clip_fix/, crosswear/  agent outputs
-  references\00-new-model-playbook.md:149:<B>/<stem>.tfa   last assembled bundle;  <B>/out_builds/<stem>_mNN.tfa  every
- build kept (+ backups of the installed file)
-  references\00-new-model-playbook.md:150:<B>/proof/       unity_verify_mNN/  ingame_serve/<tag>/  compare/  blender_re
-f_*/  futa_ur/  p01..p13 proof images
-  references\00-new-model-playbook.md:151:<B>/poses/       studio/detail/face/slots/sex*/ scenes + harness batch.json f
-iles
-  references\00-new-model-playbook.md:152:<B>/resume/      build_mNN.sh chains (copy the newest and edit)
-  references\00-new-model-playbook.md:153:<B>/locks/       lock files (lockfile.py writes to <WORK_DIR>/locks today —
-00b A29)
-  references\00-new-model-playbook.md:154:<B>/PROGRESS.md  REQUESTS.md  RESUME.md
-  references\00-new-model-playbook.md:155:```
-  references\00-new-model-playbook.md:156:Index-bound to the body mesh (regenerate after any body change): `futa_piece.
-npz`, `holes_geometry.json`,
-> references\00-new-model-playbook.md:157:`canonical_map.npz`, `suit_shell.npz` (HIDE list), the 4 cloth patches (assem
-bler), `extras/*.npz`. Not index-bound:
-  references\00-new-model-playbook.md:158:`skeleton.json`, `face_pose_sim.json`, `outfit_switches.json`, `tex/`, `bake/
-` (ref 17 §16.3).
-  references\00-new-model-playbook.md:159:
-  references\00-new-model-playbook.md:160:## 4. Stages
-  references\00-new-model-playbook.md:161:Times are the case-study model's (this PC, the available RAM, Cycles on CPU;
-from logs and refs 17/19); "n/m" = not measured. Lock = what
-  references\00-new-model-playbook.md:162:to hold while it runs.
-  references\00-new-model-playbook.md:163:
-  references\00-new-model-playbook.md:164:| # | Stage | Script | Writes | Time (the case-study model) | Lock | Kind (§
-4a) |
-  references\00-new-model-playbook.md:165:|---|---|---|---|---|---|---|
-  references\00-new-model-playbook.md:166:| S0 | inventory, rig dump, mapping, outfit switches | `blender/blend_invento
-ry.py`, `blend_inspect.py`, `blend_rig_dump.py`, `rig_automap.py`, `blender/dump_outfit_switches.py` | inventory, defor
-m bones, slots, switches | n/m (minutes) | blender | AUTO dumps · AI sign-off, text review, mapping issues |
-  references\00-new-model-playbook.md:167:| S1 | T-pose bake | `blender/stage2_tpose_bake.py` | `stage2.blend`, report,
- renders | 25 s (v2) | blender | AUTO |
-  references\00-new-model-playbook.md:168:| S2 | exports | `blender/export_blend_meshes.py`, `export_corner_frames.py`,
- `export_shape_keys.py` | `export/`, `frames/`, `keys/` | <10 s, ~15 s, 42 s | blender | AUTO |
-  references\00-new-model-playbook.md:169:| S3 | skeleton | `own_rig.py` | `skeleton.json` | seconds | — | AUTO |
-  references\00-new-model-playbook.md:172:| S6 | futa piece | a) `own_futa.py` (model's futa variant) · b) `blender/ex
-port_rigged_asset.py` + `own_futa_asset.py` + `blender/render_futa_fusion.py` (user penis asset) | `futa_piece.npz` (+
-fused textures) | a) 2 s · b) n/m | b) blender | AUTO · b) AI spec/map + fusion review |
-  references\00-new-model-playbook.md:173:| S7 | material bakes | `blender/bake_material_maps.py` (+ `bake_detail_tiles
-.py`, `bake_layer_maps.py`, `make_game_atlas.py`) | `bake/<tag>_<pass>.<tile>.png` | 43 s per pass per 4096 tile; 62 ob
-jects ≈ 75 min; lit pass ≈ 55 min | blender | AUTO · AI `--props` choice |
-  references\00-new-model-playbook.md:174:| S8 | textures | `own_textures.py` | `tex/` or `tex_mNN/` `<name>.{bin,json}
-` | 37 outfit items ≈ 25 min | — | AUTO |
-  references\00-new-model-playbook.md:175:| S9 | suit / skin layers | `own_suit_v2.py` (v2, in builds) · `own_layers.p
-y` (v3 suit, stockings, pubes, translucent, endo — in flight) | `suit_shell.npz`, layer shells | 71 s (v2) | — | AUTO
- · AI thresholds/look |
-  references\00-new-model-playbook.md:176:| S10 | canonical map | `own_canonical_map.py` | `canonical_map.npz` | 31 s |
- — | AUTO |
-> references\00-new-model-playbook.md:177:| S11 | face-control clips | `extract_face_control_clips.py` | `data/face_con
-trol_clips.json` (once per game version) | n/m | — | AUTO (per game build) |
-> references\00-new-model-playbook.md:178:| S12 | voice, bone cloth, clip fix, cross-wear | `own_voice.py`, `own_bonecl
-oth.py`, `own_cloth_colliders.py`, agents' modules | `own/voice/out`, `own/bonecloth`, … | — | — | AUTO builds · AI
- categorise/select/review |
-> references\00-new-model-playbook.md:179:| S13 | assemble | `assemble_own.py` (+ `tfa_writer.py`, `prefab.py`, `unity_
-mesh.py`, `own_cloth.py`, `own_meshes.py`, `own_outfit_items.py`, `own_voice.py`) | `<stem>.tfa`, `assemble_report.json
-` | ≈2.5 min (m18) | — | AUTO |
-  references\00-new-model-playbook.md:180:| S14 | static checks | `tfa_validate.py`, `compare_prefab_fields.py`, `check
-_weights.py` | json reports | 32 s (validate) | — | AUTO · AI live-row triage |
-  references\00-new-model-playbook.md:181:| S15 | Unity lab verify | `unity_lab/run_unity_verify.py` | `proof/unity_ver
-ify_mNN/` | ≈1 min (m18) | unity | AUTO |
-  references\00-new-model-playbook.md:182:| S16 | install (+ portrait plugin) | `cp`; `ingame_test/TfaPortraits` | `Mod
-s/Characters/<stem>.tfa`, `Mods/Portraits/<stem>.png` | — | game (if running) | AUTO (gated) · AI portrait choice |
-  references\00-new-model-playbook.md:183:| S17 | in-game tests | `ingame_test/run_ingame_test.py`, `harness_client.py`
-, `live_protocol.py`, batches | `proof/ingame_serve/<tag>/` | 5 batches ≈ 16 min | game | AUTO batches · AI look revi
-ew |
-  references\00-new-model-playbook.md:184:| S18 | source-model benchmark (mandatory) | S0–S17 on a shipped character's
- source + `prefab_fulldiff.py` vs the pair, `tfa_shipped_lib.py`, A/B batches | `reports/<model>/bench/` | n/m | as S0
-–S17 | AUTO · AI diff/look review |
-  references\00-new-model-playbook.md:185:
-  references\00-new-model-playbook.md:186:### 4a. AUTO vs AI per step (bulk import: `scripts/bulk_import.py` runs AUTO,
- queues AI — 00c §3/§4)
-  references\00-new-model-playbook.md:187:| Step | Kind | Why it is (still) AI / what decides | What would make it AUTO
- |
-  references\00-new-model-playbook.md:188:|---|---|---|---|
-  references\00-new-model-playbook.md:189:| S0 dumps (`blend_inventory`, `blend_inspect`, `blend_rig_dump`, `dump_outfi
-t_switches`) | AUTO | deterministic reads of the file (`-b -Y`) | — |
-  references\00-new-model-playbook.md:190:| S0 adult + licence sign-off | AI + human | age evidence and licence terms n
-eed judgment and a human decision; refuse ambiguous age | never fully; pre-fill the task with the licence page / embedd
-ed licence text |
-  references\00-new-model-playbook.md:191:| S0 embedded-text review | AI | texts and scripts inside a downloaded `.blen
-d` may be malicious or carry licence terms | static scanner (imports of os/subprocess/socket, handlers, driver expressi
-ons) → AI only on hits |
-  references\00-new-model-playbook.md:192:| S0 `rig_automap` | AUTO; AI when `issues` is non-empty | name/topology rule
-s; an unknown rig family needs a decision | rule tables per rig family (CloudRig, Rigify, Auto-Rig Pro) learned from th
-e S18 pairs |
-  references\00-new-model-playbook.md:193:| CFG: stage-2, body, assemble, face profile, presets, bake jobs | AI | objec
-t roles (nude bodies, outfits, fit keys, rig props, slots) are read from names and the inventory; the case-study model'
-s were hand-written | derive from inventory + mapping + rig-family templates; the S18 source→shipped pairs are the gro
-und truth for the derivation |
-> references\00-new-model-playbook.md:194:| S1 T-pose bake, S2 exports, S3 skeleton, S5 body, S6a futa variant, S8 text
-ures, S10 canonical map, S11 clips, S13 assemble, S15 Unity verify | AUTO | config-driven (S3/S5/S13 still need the 00b
- keys for non-CloudRig rigs) | — |
-  references\00-new-model-playbook.md:195:| S4 face recipes + pose | AUTO; look review AI | expression quality is visua
-l | numeric checks of every control against the shipped clip ranges |
-  references\00-new-model-playbook.md:196:| S6b asset spec + map | AI | choosing chain bones, base ring, foreskin state
-s in an arbitrary asset | infer from the asset's bone names + base-ring detection on the mesh |
-  references\00-new-model-playbook.md:197:| S6b fit + fuse | AUTO | — | — |
-  references\00-new-model-playbook.md:198:| S6b fusion proof | AI | seam visibility is judged on renders | seam metrics
-: gap (mm), normal jump, colour ΔE across the junction |
-  references\00-new-model-playbook.md:199:| S7 bakes | AUTO; `--props` choice AI | which rig switches give the bare-ski
-n vs the suit look needs reading the material drivers | material-driver analysis (`dump_outfit_switches`) mapping switc
-hes → mask layers |
-  references\00-new-model-playbook.md:200:| S9 suit shell | AUTO; thresholds/look AI | mask thresholds and thickness ch
-osen by eye | threshold from the mask histogram (bimodal split) + thickness from the source shell |
-> references\00-new-model-playbook.md:201:| S12 voice | AUTO build; categories AI | sorting user files into Pleasure/Pa
-in/Like/Dislike/Greeting/Breath | STT + keyword rules (`voice_stt.py`), AI only on low confidence |
-> references\00-new-model-playbook.md:202:| S12 bone cloth | AUTO generation; chain choice AI | which strands/garments
-get bone cloth | chain detection from unweighted helper chains / names |
-> references\00-new-model-playbook.md:203:| S12 clip fix | AUTO lists; residual clipping review AI | judged on posed sh
-ots | ray-cast penetration depth per garment in posed frames |
-  references\00-new-model-playbook.md:204:| S14 validate + fulldiff | AUTO; live-row triage AI | a differing live field
- may be intended (own proportions) or a defect | per-field rules learned from the official references (constant in all
-official ⇒ contract) |
-  references\00-new-model-playbook.md:205:| S16 install | AUTO, gated | refused unless every gate and every benchmark p
-assed | — |
-  references\00-new-model-playbook.md:206:| S16 portrait | AI | which picture makes a good banner | fixed render camera
- + crop rule |
-  references\00-new-model-playbook.md:207:| S17 batches | AUTO | — (the case-study model's batches are copied by hand,
- 00b P9) | batch generator from the presets |
-  references\00-new-model-playbook.md:208:| S17 picture judging | AI | look quality vs the Blender reference and the sh
-ipped pair | numeric checks: blank-frame (driver gate), A/B SSIM per frame vs the shipped pair |
-  references\00-new-model-playbook.md:209:| S18 benchmark | AUTO; diff/look review AI | which differences matter | as S
-14 + S17 |
-  references\00-new-model-playbook.md:210:| §10 re-verification after a game update | AUTO dump/diff/remap; AI for mid
--function and data addresses, contract review | REA work | signature-based function matching (REA `compare_functions`)
-for the remainder |
-  references\00-new-model-playbook.md:211:
-  references\00-new-model-playbook.md:212:### S0 — inventory, rights, rig mapping (Blender lock) — AUTO dumps · AI s
-ign-off, text review, mapping issues
-  references\00-new-model-playbook.md:213:```bash
-  references\00-new-model-playbook.md:214:lk acquire blender lead && {
-  references\00-new-model-playbook.md:215:"$BL" -b -Y "$SRC" --python "$SK/scripts/blender/blend_inventory.py" -- "$O/b
-lend_inventory.json" "$O/blend_inventory.md"
-  references\00-new-model-playbook.md:380:    --out <model>_build/own --proof <model>_build/proof/p09_canonical_map.png
-  references\00-new-model-playbook.md:381:```
-  references\00-new-model-playbook.md:382:Check report coverage per region; on a dense body expand incoming hide lists
-through the inverse map (ref 17 §16.2).
-  references\00-new-model-playbook.md:383:Cross-wear agent (`own/crosswear`, in flight) owns the "she wears shipped out
-fits and vice versa" work.
-  references\00-new-model-playbook.md:384:
-> references\00-new-model-playbook.md:385:### S11 — face-control clips (once per game version; game data) — AUTO (per
- game build)
-  references\00-new-model-playbook.md:386:```bash
-  references\00-new-model-playbook.md:387:py -3 "$SK/scripts/extract_face_control_clips.py" "$G/Mods/Characters" "$D/fa
-ce_control_clips.json" --n 8
-  references\00-new-model-playbook.md:388:```
-  references\00-new-model-playbook.md:389:Already in `data/`; re-run only after a game update. Check: 29 clips kept, al
-l identical across the 8 characters.
-  references\00-new-model-playbook.md:390:
-> references\00-new-model-playbook.md:391:### S12 — streams owned by agents (integrate when they deliver) — AUTO buil
-ds · AI categorise/select/review
-> references\00-new-model-playbook.md:392:* **Voice** (ref 24): drop the user's files into `own/voice/src/` (category f
-olders or `<Category>_<nn>` names; the
-> references\00-new-model-playbook.md:393:  six terms are case-sensitive in game), `py -3 "$SK/scripts/own_voice.py" bu
-ild <src> <out>`; the assembler attaches
-> references\00-new-model-playbook.md:394:  `<voice_dir>` automatically (cfg `voice`, `voice_dir`, `voice_src` = rebuil
-d when the drop folder changed). Optional
-> references\00-new-model-playbook.md:395:  transcription for auto-categories: `voice_stt.py` in its own venv (docstrin
-g).
-> references\00-new-model-playbook.md:396:* **Bone cloth** (ref 23): `own_bonecloth.py` (port of the game's editor gene
-rator, regenerates 74/74 shipped line
-> references\00-new-model-playbook.md:397:  cloths), `own_cloth_colliders.py` (capsules fitted to the skin), `proof_bon
-ecloth.py`; data + `own/bonecloth/INTEGRATION.md`
-> references\00-new-model-playbook.md:398:  (cloth hook integrated in `assemble_own.py` since build 19b). Hair that mov
-es as one block (few chains, blocky
-  references\00-new-model-playbook.md:399:  weights): cut it into locks with `own_hair_locks.py` (ref 23 section 8), ho
-oks `add_bones` after the skeleton +
-> references\00-new-model-playbook.md:400:  `reskin` after `MeshBuilder.build` (the case-study model: patch `own/bonecl
-oth/assemble_hairlocks.patch`, build 21), verify with
-> references\00-new-model-playbook.md:401:  `verify_bonecloth_integration.py`.
-> references\00-new-model-playbook.md:402:* **Clothes clipping** (clip-fix agent, `own/clip_fix`): `tfa_push_study.py`
-(read-only study of shipped push lists vs
-  references\00-new-model-playbook.md:403:  geometry), `clip_geom.py` (closest point / signed distance / rays / LBS hel
-pers) — pitfall C10.
-  references\00-new-model-playbook.md:404:* **Genital graft from a user asset** (holes agent, `own_v3g`), **GameAtlas v
-3** (texture baker), **skin layers v3**
-  references\00-new-model-playbook.md:405:  (suit agent), **expressions** (face agent), **cross-wear** (cross-wear agen
-t).
-  references\00-new-model-playbook.md:406:* Shared numpy tools: `mesh_ops.py` (Catmull-Clark on numpy meshes incl. shap
-e keys/UVs, boundary loops, bridging,
-  references\00-new-model-playbook.md:407:  smoothing), `soft_render.py` / `softraster.py` (CPU z-buffer proof renders
-without Blender).
-  references\00-new-model-playbook.md:408:
-  references\00-new-model-playbook.md:409:### S13 — assemble (Python) — AUTO
-  references\00-new-model-playbook.md:410:```bash
-  references\00-new-model-playbook.md:411:cp "$D/<model>_assemble_m<NN-1>_cfg.json" "$D/<model>_assemble_mNN_cfg.json"
-     # edit the copy; keep every build's cfg
-  references\00-new-model-playbook.md:412:before=$(stat -c %Y "$B/<stem>.tfa" 2>/dev/null || echo 0)
-  references\00-new-model-playbook.md:413:cd "$SK/scripts" && py -3 assemble_own.py "$D/<model>_assemble_mNN_cfg.json"
-> "$O/logs/assemble_mNN.log" 2>&1; echo "assemble exit $?"
-  references\00-new-model-playbook.md:414:after=$(stat -c %Y "$B/<stem>.tfa" 2>/dev/null || echo 0)
-  references\00-new-model-playbook.md:416:cp "$B/<stem>.tfa" "$B/out_builds/<stem>_mNN.tfa"
-  references\00-new-model-playbook.md:417:```
-  references\00-new-model-playbook.md:418:Builds the whole prefab from the build files with `tfa_writer.py` (UnityFS fr
-om the game's type trees; no Unity
-  references\00-new-model-playbook.md:419:project, no shipped object). **Per-build overrides** (mix new parts in withou
-t copying the 4 GB own dir): `body_npz`
-  references\00-new-model-playbook.md:420:(replacement Body_), `futa_npz` (replacement futa piece), `holes_json` (repla
-cement `holes_geometry.json`), `tex_dirs`
-> references\00-new-model-playbook.md:421:(searched before `<own_dir>/tex`), `voice_dir`/`voice_src`. Everything else (
-`skeleton.json`, `suit_shell.npz`,
-  references\00-new-model-playbook.md:422:`face_pose_sim.json`, `outfit_switches.json`) is still read from `own_dir`: a
- replacement body with a different vertex
-  references\00-new-model-playbook.md:423:order invalidates the suit HIDE list (pitfall B10, 00b A35). Check `<own_dir>
-/assemble_report.json`:
-> references\00-new-model-playbook.md:424:`checks.skeleton_max_world_err_mm` ≈ 0 (2e-5), `face_pose_frame0_vs_skeleton
-_mm` (0.03), every cloth part
-  references\00-new-model-playbook.md:425:`rest_reconstruction_err_m` ~1e-16 with `max_tris_per_vertex` and `max_weight
-s` ≤ 15, `holes` 5 points each,
-> references\00-new-model-playbook.md:426:`throat_distance_m`, `open_max_m`, `penis_cloth_colliders` = 7, `face_control
-_clips` = 29, `futa.futa_vertices`,
-> references\00-new-model-playbook.md:427:`voice.lines`, `outfit_missing` and `warnings` absent, `collision_body.max_ma
-p_dist_mm`, `shoes_collider.heel_height_m`,
-  references\00-new-model-playbook.md:428:`bundle.bytes`.
-  references\00-new-model-playbook.md:429:
-  references\00-new-model-playbook.md:430:### S14 — static checks (Python) — AUTO · AI live-row triage
-  references\00-new-model-playbook.md:431:```bash
-  references\00-new-model-playbook.md:432:C="<CLEAN_GAME_DIR>/Mods/Characters"        # clean install: official charact
-ers (AGENT_BRIEF §11/§12)
-  references\00-new-model-playbook.md:433:py -3 "$SK/scripts/tfa_validate.py" "$G/Mods/Characters/<stem>.tfa" --json "$
-B/proof/validate_mNN.json"
-  references\00-new-model-playbook.md:434:py -3 "$SK/scripts/prefab_fulldiff.py" "$B/<stem>.tfa" "$C/succubus.tfa" "$C/
-queen.tfa" "$C/primrose.tfa" \
-  references\00-new-model-playbook.md:435:    --out "$B/proof/fulldiff_mNN" --ours-name <stem>
- # THE gate (00a §D): every object/component/field
-  references\00-new-model-playbook.md:436:py -3 "$SK/scripts/review/fulldiff_multi.py" "$B/<stem>.tfa" --ref official="
-$C/succubus.tfa,$C/queen.tfa,$C/primrose.tfa" \
-  references\00-new-model-playbook.md:437:    --ref community="$G/Mods/Characters/tifa.tfa,$G/Mods/Characters/yennefer.
-tfa" --ours-name <stem> --out "$B/proof/fulldiff_multi_mNN"
-  references\00-new-model-playbook.md:438:py -3 "$SK/scripts/bulk_import.py" gate <bulk.json> --model <model> --gate fu
-lldiff --input "$B/proof/fulldiff_mNN/fulldiff.json"
-  references\00-new-model-playbook.md:439:py -3 "$SK/scripts/compare_prefab_fields.py" "$C/succubus.tfa" "$B/<stem>.tfa
-" "$O/prefab_field_gaps.json"
-  references\00-new-model-playbook.md:440:# skinning gates (references/32): posed stretch of every mesh (Unity-lab pose
- + real-use poses) from the Unity-lab dump
-  references\00-new-model-playbook.md:441:# folder of this build, foot markers level. PASS: Unity-lab max < 2.5 per mes
-h, Body_ < 2.0 (ref 32 §4.2); markers ok.
-  references\00-new-model-playbook.md:442:py -3 "$SK/scripts/lowprio.py" -- py -3 "$SK/scripts/audit/posed_stretch.py"
-"$B/proof/unity_verify_mNN" --poses all --json "$B/proof/stretch_mNN.json"
-  references\00-new-model-playbook.md:443:py -3 "$SK/scripts/lowprio.py" -- py -3 "$SK/scripts/audit/foot_markers_check
-.py" "$B/<stem>.tfa"
-> references\00-new-model-playbook.md:444:# soft-tissue -> collision cage binding (00a I6): FAIL = stale identity bindi
-ng, unequal lists, pair p50 >= 1 mm
-  references\00-new-model-playbook.md:445:py -3 "$SK/scripts/check_col_binding.py" "$B/<stem>.tfa" --json "$B/proof/col
-_binding_mNN.json"   # (wrapper with exit code:
-  references\00-new-model-playbook.md:446:#   <WORK_DIR>/own/integration/tools/col_binding_gate.py <bundle> <out.json>)
-  references\00-new-model-playbook.md:447:# skin bindings of EVERY renderer vs the previous build (same hashed pose on
-both; read the FLAG column; intended re-weights
-  references\00-new-model-playbook.md:448:# also show POSED, a wrong bone list shows tens-hundreds of mm on every verte
-x). UnityPy cannot decode some extras
-  references\00-new-model-playbook.md:449:# (TeethUpper/Lower, Eyes, weapon): compare those from the Unity-lab dumps (m
-esh_<path>_w4.bin + _bones.txt) instead.
-  references\00-new-model-playbook.md:450:py -3 "$SK/scripts/lowprio.py" --mem 14 -- py -3 "$SK/scripts/audit/bind_audi
-t.py" "$B/out_builds/<previous>.tfa" "$B/<stem>.tfa" --json "$B/proof/bind_audit_mNN.json"
-  references\00-new-model-playbook.md:451:```
-  references\00-new-model-playbook.md:452:A failing skinning gate is repaired with `scripts/skin_repair.py` (export ->
-survey -> rules -> repair -> fit-check ->
-  references\00-new-model-playbook.md:453:renders; ref 32 §4) and integrated through the assembler hook `SkinRepairHoo
-k` (cfg `skin_repair_rules`).
-  references\00-new-model-playbook.md:454:The fulldiff gate (bulk_import `gate fulldiff`) fails on any contract-field r
-ow (enable flags, tags, layers, culling
-  references\00-new-model-playbook.md:455:lists, deformer links, body tints, muscles, wet params), on missing component
-s (content-specific ones allowlisted with a
-  references\00-new-model-playbook.md:456:reason) and on unreviewed live rows; stale fields (absent from the game's cur
-rent class in types.cs) are ignored —
-  references\00-new-model-playbook.md:483:`Resources.Load<Sprite>("UI/Characters/" + name)` from its own Resources (ref
- 13 R14), so a `.tfa` cannot carry one.
-  references\00-new-model-playbook.md:484:The BepInEx plugin `scripts/ingame_test/TfaPortraits` (Harmony postfix on `Re
-sources.Load(string, Type)` + prefix on
-  references\00-new-model-playbook.md:485:`ImageButton.SetImage`, no game file changed) serves `Mods/Portraits/<name>.p
-ng` (or `Mods/Characters/<name>.png`; key =
-  references\00-new-model-playbook.md:486:name lower-case, spaces → `_`): `cd scripts/ingame_test/TfaPortraits && dotn
-et build -c Release`, copy
-  references\00-new-model-playbook.md:487:`bin/Release/net6.0/TfaPortraits.dll` to `BepInEx/plugins/TfaPortraits/`, put
- the PNG in place, restart the game once.
-> references\00-new-model-playbook.md:488:**Tile picture (2026-10-25, 13 §S12b):** the game crops tiles by `Sprite.bor
-der`; TfaPortraits >= 1.1.0 sets it from the picture size, so the picture must be face-centred, 1200x503 (aspect 303:12
-7), eyes at 0.45 of the height. Make it from the SOURCE .blend, not from a camshot: `blender/render_portrait.py` (Cycle
-s, the file's own suns/materials, 2.4 m long lens, eyes into the lens) -> `make_tile_portrait.py` (ground gradient, lin
-ear-light downsample, framing checks, install + backup) ; `tile_layout_sim.py` predicts/verifies both tiles.
-  references\00-new-model-playbook.md:489:Check `BepInEx/LogOutput.log`: `portrait files: N [...]`, `patched Resources.
-Load(string, Type)`, `patched
-  references\00-new-model-playbook.md:490:ImageButton.SetImage` (observed 2026-10-16) and `portrait <name>: WxH from <f
-ile>` when the select screen asks (not yet
-  references\00-new-model-playbook.md:491:seen — display unverified), then a screenshot of the character select.
-  references\00-new-model-playbook.md:492:
-  references\00-new-model-playbook.md:493:### S17 — in-game tests (game lock) — AUTO batches · AI look review: §6.
-  references\00-new-model-playbook.md:494:
-  references\00-new-model-playbook.md:495:### S18 — source-model benchmark (mandatory before any bulk run) — AUTO ·
-AI diff/look review
-  references\00-new-model-playbook.md:496:"if your process cannot produce the same or better tfa than the shipped tfa f
-rom the
-  references\00-new-model-playbook.md:497:models, your process is  and needs redo". 18 shipped characters have their so
-urce packages in
-  references\00-new-model-playbook.md:498:`3d_model/Character_original_model/` (pairs table: 00c §6; untrusted: `-b -Y
-`); the conversion study (how the developer
-  references\00-new-model-playbook.md:499:made them) is references/31 (origin analysts, in progress). Run S0–S17 on a
-source under a stem that differs from the
-  references\00-new-model-playbook.md:500:shipped one (`<name>_bench`, installed only for the test and removed afterwar
-ds), then:
-  references\00-new-model-playbook.md:513:
-  references\00-new-model-playbook.md:514:## 5. Model-specific vs generic
-  references\00-new-model-playbook.md:515:| Model-specific (new values per model, in config/data files) | Generic (game
- contract, same for every character; do not edit per model) |
-  references\00-new-model-playbook.md:516:|---|---|
-  references\00-new-model-playbook.md:517:| source/armature/object/material names, collections, FK controls, IK props (
-stage-2 cfg) | `_base` layer: 77 BodyBone entries, 96 skin bones, helper-chain rules (`own_rig.py`, ref 17 §1) |
-> references\00-new-model-playbook.md:518:| rig slot mapping (`<model>_rig_mapping.json`), skin map rules (body cfg `sk
-in_map`) | Rig slot names, Puppet/IK/ClothColliders names and capsule set (`assemble_own.py`) |
-  references\00-new-model-playbook.md:519:| UDIM tiles → atlas slots / atlas grid, UV map name, futa tile | region atl
-as cells (`own_body.CELL`, ref 13 §2.4) |
-  references\00-new-model-playbook.md:520:| hole/muscle shape keys, canal keys + radii, region thresholds | Body_ shape
- names, patch shapes/regions, `m_mergedBody` order (ref 13 §2.1–2.3) |
-  references\00-new-model-playbook.md:521:| fit keys, face corrective keys, face rig profile + recipes | FaceRig frame
-table (ref 13 §3.3), 29 face-control clips (game data) |
-  references\00-new-model-playbook.md:522:| extras list (objects, kinds, regions, slots), outfit presets, outfit materi
-al classes, tight-garment distances | Unified material scalars per class (measured on shipped runtime materials, ref 19
- §11/§13) |
-> references\00-new-model-playbook.md:523:| bake jobs and `--props` for the skin look vs the suit look | cloth paramete
-r profiles (`data/cloth_param_profiles.json`, bone-cloth profiles (`own_bonecloth.extract_profiles` -> a local file out
-side the toolset, e.g. `<SHIPPED_LIB_DIR>/_bonecloth/bonecloth_param_profiles.json`)) |
-  references\00-new-model-playbook.md:524:| user-asset spec + map (penis: chain, balls, foreskin state, fusion band) |
-game shaft chain `shaft1..7_base`, `penisTip_base`, `Testicle.L/R_base`, `Penis_Skin`, `Hide_Penis` |
-  references\00-new-model-playbook.md:525:| material tuning (`normals_scale`, `robot_specular`, …) after a live A/B |
-bundle format, writer, type trees, class defaults |
-  references\00-new-model-playbook.md:526:| visemes (authored control values, in code today), hole-path lengths (tifa-m
-easured, scaled by height) | Customize clip convention (option k = frame k), hole names Mouth/Vagina/Anus |
-> references\00-new-model-playbook.md:527:| test scenes: the stem, the Nude option index, slot names; portrait PNG; voi
-ce files | harness commands, batch format, TfaPortraits plugin, voice search terms |
-  references\00-new-model-playbook.md:528:
-  references\00-new-model-playbook.md:529:Everything model-specific that is still in code is listed in `00b-hardcoded-a
-udit.md` with its proposed key.
-  references\00-new-model-playbook.md:530:
-  references\00-new-model-playbook.md:531:## 6. Testing protocol (real use — memory `test-like-real-use-feedback`, the
- request backlog8)
-  references\00-new-model-playbook.md:532:1. **Start the game once in serve mode** and keep it running:
-  references\00-new-model-playbook.md:533:   `py -3 "$SK/scripts/ingame_test/run_ingame_test.py" --bundle "$B/<stem>.tf
-a" --serve --out "$B/proof/ingame_serve/start_<tag>"`
-  references\00-new-model-playbook.md:534:   (deploys the harness DLL, relaunches automatically when the game needs a s
-econd launch). A rebuilt bundle = copy
-  references\00-new-model-playbook.md:535:   over `Mods/Characters/<stem>.tfa` + `spawn`; restart only for a new plugin
- DLL or after a motion-thread freeze:
-  references\00-new-model-playbook.md:536:   `<WORK_DIR>/resume/restart_serve.sh` (`taskkill //IM TrueFacials.exe //F`,
- redeploy, `--serve`).
-  references\00-new-model-playbook.md:537:2. **Batches** — `py -3 "$SK/scripts/ingame_test/harness_client.py" --out <d
-ir> --cmds <batch.json> --timeout <s>`
-  references\00-new-model-playbook.md:538:   (harness commands in `TfaTestHarness/Plugin.cs`, 2026-10-18: `spawn add ta
-rget replace scene pose wait waitsettle
-  references\00-new-model-playbook.md:539:   rotate shot camshot cam diag state map mat mattex matswap texinfo globals
-hide lua audio record menu ui uilist obj
-  references\00-new-model-playbook.md:571:7. **Physics probes:** faunaLABS LuaRegistry (installed plugin; licence unkno
-wn — test use only) exposes
-  references\00-new-model-playbook.md:572:   Rigidbody/SphereCollider/ConfigurableJoint and penis length to Lua (`human
-:GetRigidbody(MTarget)`, drag, inertia,
-  references\00-new-model-playbook.md:573:   joint drives, `SetPenisLength`) for physics tuning scenes (AGENT_BRIEF §1
-4). **Vanilla check:** the clean 0.5991
-  references\00-new-model-playbook.md:574:   install (`<CLEAN_GAME_DIR>`, read-only, no BepInEx) proves the bundle load
-s without mods —
-  references\00-new-model-playbook.md:575:   copy only our `.tfa` there for that test and remove it afterwards (AGENT_B
-RIEF §11) [plan: not run yet].
-> references\00-new-model-playbook.md:576:8. **UI and voice:** character-select picture (TfaPortraits, S16); voice: a G
-reeting on spawn, Like/Dislike chatter,
-  references\00-new-model-playbook.md:577:   Pleasure/Pain on thrusts (ref 24 §2) once clips exist.
-  references\00-new-model-playbook.md:578:9. **Pass:** no `EXCEPTION` in the batch result log, no `Error in motion thre
-ad` / `Error detected, stopping further
-> references\00-new-model-playbook.md:579:   processing` / `INVALID CHARACTER SHADER` in `BepInEx/LogOutput.log` (worke
-r-thread errors such as `Error in motion thread` appear only in `<outDir>/unity_errors.log` (harness v6), ref 13 §S11;
- every pose passes `pose_lint.py`), character = our stem (never the `primrose`
-  references\00-new-model-playbook.md:580:   fallback), holes visible and opening, no blades or detached parts, garment
-s and shoes on the body and above the floor.
-  references\00-new-model-playbook.md:581:
-  references\00-new-model-playbook.md:582:## 7. Agents and locks
-  references\00-new-model-playbook.md:583:Definitions: `.claude/agents/tfa-*.md` (shared rules block: never edit `assem
-ble_own.py` — the lead integrates; deliver
-  references\00-new-model-playbook.md:584:modules + `INTEGRATION.md`; save learnings into `references/` and PROGRESS.md
-). After a provider outage stop, resume each
-  references\00-new-model-playbook.md:585:agent with its context (`SendMessage`: "Credit is back. Continue exactly wher
-e you stopped; re-check locks with
-  references\00-new-model-playbook.md:586:lockfile.py status first.") instead of spawning a new one; relaunch with `a c
-apable model` only when it died. Agent IDs and
-  references\00-new-model-playbook.md:587:the last step of each are in `<WORK_DIR>/RESUME.md`.
-  references\00-new-model-playbook.md:588:| Agent (definition) | Owns | Main outputs |
-  references\00-new-model-playbook.md:589:|---|---|---|
-  references\00-new-model-playbook.md:590:| lead (main session) | configs, `assemble_own.py`, builds, integration, user
- assets (penis), PROGRESS/RESUME | `out_builds/`, `resume/build_mNN*.sh` |
-  references\00-new-model-playbook.md:591:| `tfa-subdiv-exporter` | S1–S2 with `subsurf_objects`, S5–S10 on a second
-build dir | `own_v2/`, `stage2_v2.blend` |
-  references\00-new-model-playbook.md:592:| `tfa-texture-baker` | S7–S8, lit bake, GameAtlas v3 | `own/bake`, `own/tex
-`, `own_v3/` |
-  references\00-new-model-playbook.md:593:| `tfa-suit-builder` | S9 and the other skin layers (stockings, pubes, transl
-ucent, endoskeleton) | `own/suit_*`, `own_layers.py` |
-  references\00-new-model-playbook.md:594:| `tfa-holes-genitals` | hole paths, canals, holes v2, genital textures, user
--asset vulva graft | `own/holes_v2`, `own_v3g` |
-> references\00-new-model-playbook.md:595:| `tfa-bonecloth-builder` | MagicaBoneCloth (hair, jacket), cloth colliders;
-also runs the clip fixer | `own/bonecloth`, `own/clip_fix`, ref 23 |
-> references\00-new-model-playbook.md:596:| `tfa-voice-pipeline` | voice lines, music, intake + transcription | `own/vo
-ice`, ref 24 |
-  references\00-new-model-playbook.md:597:| `tfa-game-researcher` | REA/Ghidra questions; also the corpus miner and cro
-ss-wear agents | `references/2x`, `data/corpus_full`, `own/crosswear` |
-  references\00-new-model-playbook.md:598:| `tfa-ingame-tester` | S17, batches, A/B, sheets, UI spawn, portrait check |
- `proof/ingame_*`, FINDINGS.md |
-  references\00-new-model-playbook.md:599:| `tfa-character-importer` | skill librarian (this playbook), face expression
-s; definition still describes the old donor method (00b P8) | `references/00*`, `own/face_v2` |
-> references\00-new-model-playbook.md:600:| reviewer (general-purpose) | defect review of body/clothes | `proof/review/
-` |
-  references\00-new-model-playbook.md:601:
-  references\00-new-model-playbook.md:602:Lock protocol (`scripts/lockfile.py`, via the quoted `lk` function): `lk acqu
-ire <blender|unity|ghidra|game> <owner>
-  references\00-new-model-playbook.md:603:[--wait s]` blocks until free (default 7 200 s, exit 2 on timeout); always ch
-ain the locked process with `&&` so a failed
-  references\00-new-model-playbook.md:604:acquire skips it (that guard saved the m19 chain, pitfall E16); `lk release <
-resource> <owner>` right after the process,
-  references\00-new-model-playbook.md:605:also on failure (`trap`); `lk status` lists holders; a lock older than 6 h is
- stale and taken over. Hold it only while the
-  references\00-new-model-playbook.md:606:external process runs. Python-only stages need no lock but avoid running them
- during a Ghidra analysis (RAM, ref 07).
-  references\00-new-model-playbook.md:607:Agents checkpoint in `<their folder>/STATUS.md` after every meaningful step (
-done / in progress / next / file paths) so a
-  references\00-new-model-playbook.md:608:resume after a credit stop reads one file (AGENT_BRIEF §15); background jobs
- follow §11 (no persistence).
-  references\00-new-model-playbook.md:609:
-  references\00-new-model-playbook.md:610:## 8. Open at handover (apply to the next model too)
-  references\00-new-model-playbook.md:611:Cross-character outfits (standard outfits on an own body throw `ArgumentOutOf
-RangeException`; needs the canonical map
-> references\00-new-model-playbook.md:612:in the push lists — PROGRESS B3, ref 13 §7a; cross-wear agent) · clothes c
-lipping (C10; clip-fix agent) · m19 in-game
-  references\00-new-model-playbook.md:613:proof of the fused penis asset (S6b) · vulva/anus graft from user assets and
- holes v2 (holes agent) · `lit` atlas crash
-> references\00-new-model-playbook.md:614:(T7; the lit bake itself is fixed) · GameAtlas v3 / own head texture density
- (T3) · hair/jacket bone cloth integration
-> references\00-new-model-playbook.md:615:(C8) · voice clips (pipeline ready, files pending) · skin layers v3 (O5/O6)
- · posed stretch at subdivided seams (m18
-  references\00-new-model-playbook.md:616:Body_ 230 edges > 2.5×) · torn shoe / foot clipping (reviewer `proof/review
-/shoe_clip*`) · garage-map darkening ·
-  references\00-new-model-playbook.md:617:portrait display unverified · `tfa_validate.py` own-body mode · the CloudRi
-g assumptions of 00b.
-  references\00-new-model-playbook.md:618:Added 2026-10-18: re-verification of the 0.5991 build (§10: 30 addresses for
- REA, untagged references 13/18/24/25,
-  references\00-new-model-playbook.md:619:game-derived data not regenerated) · first source-model benchmark (S18, succ
-ubus in flight) · every earlier diff and
-  references\00-new-model-playbook.md:620:`<SHIPPED_LIB_DIR>` used the modded install's older copies of several shipped
- characters — redo them against the
-  references\00-new-model-playbook.md:621:clean copies · open defect after 19c: jagged bright edges at lip borders/chi
-n and cracked streaks along the vulva slit
-  references\00-new-model-playbook.md:622:(AGENT_BRIEF §18).
-  references\00-new-model-playbook.md:623:
-  references\00-new-model-playbook.md:624:## 9. the case-study model's per-model files (examples to copy)
-  references\00-new-model-playbook.md:625:`<WORK_DIR>/stage2_v2.json`, `data/shion_rig_mapping.json`, `data/shion_defor
-m_bones.json`, `data/shion_body_cfg_v2.json`,
-  references\00-new-model-playbook.md:626:`data/face_rig_profile_shion.json`, `data/face_pose_recipes_shion.json`, `dat
-a/shion_outfit_presets.json`,
-  references\00-new-model-playbook.md:627:`data/shion_assemble_m19_cfg.json` (all build cfgs m1b…m19 kept), `<WORK_DIR
->/own/bake_jobs.txt`,
-  references\00-new-model-playbook.md:628:`<WORK_DIR>/own/assets/penisur_spec.json`, `data/futa_asset_map_penisur.json`
-, `data/shion_game_atlas_v3.json`,
-  references\00-new-model-playbook.md:629:`<WORK_DIR>/resume/build_m19_chain.sh` (+ `build_m19_finish.sh`), `build_m18_
-after17.sh`, `subdiv_v2.sh`,
-  references\00-new-model-playbook.md:630:`night_validate_m18.sh`. Worked-example references: 08 (rig analysis), 17 (ow
-n skeleton/body), 19 (lab + harness),
-> references\00-new-model-playbook.md:631:21 (model inventory), 23 (bone cloth), 24 (voice).
-  references\00-new-model-playbook.md:632:
-  references\00-new-model-playbook.md:633:## 10. Game builds and re-verification (AUTO tool + AI review; details 00c §
-7)
-  references\00-new-model-playbook.md:634:* **Identify the build by hash, never by file time**: `py -3 "$SK/scripts/gam
-e_fingerprint.py" check "$G"` → exit 0
-  references\00-new-model-playbook.md:635:  (verified), 2 (known, re-verification pending), 3 (unknown = the game was u
-pdated). The 0.5991 files carry the archive
-  references\00-new-model-playbook.md:636:  mtime 2026-10-05, not the install time [obs]. Known builds + what is verifi
-ed on each: `data/game_builds.json`
-  references\00-new-model-playbook.md:637:  (0.59 `ga:f61c0f80` = baseline of the references; 0.5991 `ga:5e82b424` = cu
-rrent, status `partial` on 2026-10-18).
-  references\00-new-model-playbook.md:638:* **Tag every game fact with its build**: a document that cites addresses nam
-es the build in its header (`ga:<8 hex>`
-  references\00-new-model-playbook.md:639:  or the full SHA-256), a line that cites another build carries its own `ga:`
- tag; generated game data records the build
-  references\00-new-model-playbook.md:640:  it came from (and lives outside the toolset). `game_fingerprint.py scan "$S
-K"` lists untagged documents (2026-10-18:
-  references\00-new-model-playbook.md:641:  13, 18, 24, 25 untagged; 01 and 22 tagged 0.59).
-  references\00-new-model-playbook.md:642:* **Re-verification step after an update** (AUTO first, then an AI task; the
-bulk driver refuses S13+ until done):
-  references\00-new-model-playbook.md:643:  1. `game_fingerprint.py fp` + `add "$G" --key <version> --status unverified
-`;
-  references\00-new-model-playbook.md:648:  4. `game_fingerprint.py scan "$SK" --out scan.json` + `remap <old metadata.
-json> <new metadata.json> --scan scan.json
-  references\00-new-model-playbook.md:649:     --out remap.json` (0.59 → 0.5991: 182 of 212 cited addresses remapped b
-y method identity, 23 inside methods, 7 data
-  references\00-new-model-playbook.md:650:     addresses; every address moved) [obs];
-  references\00-new-model-playbook.md:651:  5. tags/layers (20001 AdvancedCollider, 12 Penis, 13 Ragdoll — unchanged i
-n 0.5991), rebuild the BepInEx plugins
-  references\00-new-model-playbook.md:652:     against the regenerated interop, restart the game once;
-> references\00-new-model-playbook.md:653:  6. regenerate or re-diff the game-derived data (face clips S11, class defau
-lts, shader properties, shipped library,
-  references\00-new-model-playbook.md:654:     corpus), re-fingerprint the reference bundles and diff the official char
-acters against each other;
-  references\00-new-model-playbook.md:655:  7. AI: confirm the remaining addresses with REA (Evidence IDs), review the
-typesdiff of the contract classes, update
-  references\00-new-model-playbook.md:656:     the references (new addresses or `ga:` tags), then `add --status verifie
-d`.
-  references\00-new-model-playbook.md:657:* **Shipped bundles are versioned too**: 11 of the 18 benchmark characters di
-ffer between the modded install and the
-  references\00-new-model-playbook.md:658:  clean 0.5991 package (00c §6); every diff/benchmark report records the sha
-256 of the reference copy it used.
-  references\00-new-model-playbook.md:659:
-  references\00-new-model-playbook.md:660:## 11. Running long jobs, resuming, storage
-  references\00-new-model-playbook.md:661:* **No persistence** (§1): foreground or ordinary background processes of th
-e session only (Bash `run_in_background`;
-  references\00-new-model-playbook.md:662:  never `schtasks`, services, Run keys, startup entries, supervisors, watchdo
-gs). Write chain scripts so that every step
-  references\00-new-model-playbook.md:663:  skips finished outputs (marker files, output-exists checks, the mtime-befor
-e/after check of S13), log to a file, and
-  references\00-new-model-playbook.md:664:  after a stop or restart run the same script again. `scripts/bulk_import.py
-run` behaves the same way (state files).
-  references\00-new-model-playbook.md:665:* Put large outputs on D: (`<RESEARCH_DIR>/` decompiles, dumps, benchmarks, v
-ideos; `<SHIPPED_LIB_DIR>/` extracted
-  references\00-new-model-playbook.md:687:| Any rig family other than CloudRig (00d D5) | `own_rig.py`, `own_body.py`,
-`stage2_tpose_bake.py`, parts of `assemble_own.py` read CloudRig `DEF-` names and the case-study model's body object na
-me (00b A1–A6); rig_automap misses 17 required slots on Auto-Rig Pro (succubus bench) | the 00b config keys + rig-fami
-ly profiles (the bench agent's ARP patches, `<RESEARCH_DIR>/bench/succubus/patches`) merged into the skill |
-  references\00-new-model-playbook.md:688:| CFG for non-CloudRig rigs (FK controls, IK props, skin-map rules, face rig
-profile) | needs reading the rig's controls, constraints and weights | per-family templates in `data/` |
-  references\00-new-model-playbook.md:689:| More than 4 UDIM tiles, or skin spread over more materials than body + head
- | the atlas packs a fixed 2×2 grid (00b A10, A37) | an N-tile atlas layout |
-  references\00-new-model-playbook.md:690:| Shape keys classified "other" by `decide.py` (D9) | their meaning only show
-s when the key is set in Blender | a script that renders each key at 1.0 next to the rest pose |
-  references\00-new-model-playbook.md:691:| fulldiff live-row triage (S14-AI) and the D-rows of 00a | needs the game-co
-de meaning of each field (references/13, 22) | per-field rules learned from the official characters (constant in all of
-ficial ⇒ contract, per-character range ⇒ allow) |
-> references\00-new-model-playbook.md:692:| Fixing contract defects in the generator (prefab.py force-enable D1/D2/D4,
-cloth reduction C11/D20, missing ClothTemplates/IK targets D17) | code changes in `assemble_own.py`/`prefab.py`/`own_cl
-oth.py` (lead-owned) | the fixes themselves; the gates already detect them |
-  references\00-new-model-playbook.md:693:| Re-verification after a game update, AI part (§10 step 7) | REA/Ghidra wor
-k on mid-function and data addresses | signature-based function matching |
-> references\00-new-model-playbook.md:694:| S10–S12 integration (canonical map, voice, bone cloth, clip fix) | not dri
-ver stages yet; each has its own agent INTEGRATION.md | driver stages with checks |
-  references\00-new-model-playbook.md:695:| Look quality vs the Blender reference and vs the shipped pair (S4/S6/S7/S9/
-S17/S18 AI steps) | judgment; the acceptable-answer lists in 00d make it checkable but not automatic | A/B image metric
-s per frame against the shipped pair |
-  references\00-new-model-playbook.md:696:| Licence and age decisions (signoff) | legal/ethical judgment; always the us
-er's decision | never automated |
-  references\00-new-model-playbook.md:697:
-  references\00-new-model-playbook.md:698:## §13. Unattended night run / service outage (AUTO; written 2026-10-19)
-  references\00-new-model-playbook.md:699:Everything that needs no model runs as ordinary session processes (they stop
-when the PC restarts; nothing is scheduled):
-  references\00-new-model-playbook.md:700:1. `bash <WORK_DIR>/resume/mem_watchdog.sh 300` - logs free RAM / commit / ga
-me memory every 5 min, cycles the game above
-  references\00-new-model-playbook.md:701:   24 GB through the lock, drops workers to Idle below 2 GB free. Start it fi
-rst.
-  references\00-new-model-playbook.md:702:2. `bash <WORK_DIR>/resume/mirror_backup.sh 900` - toolset, agents, memory, d
-ocs, scratch_dir to D: every 15 min.
-  references\00-new-model-playbook.md:703:3. Build chains: `resume/build_m21.sh <tag>` (assemble -> gates -> install vi
-a priority lock -> capture) or
-  references\00-new-model-playbook.md:704:   `resume/redeploy_build_v2.sh <tag>` for an existing bundle; they wait for
-locks by themselves.
-  references\00-new-model-playbook.md:705:4. Captures / A-B: `resume/capture_auto.sh <tag> [name]`, `resume/capture_ab_
-shipped.sh ab` (FIFO lock queue).
-  references\00-new-model-playbook.md:706:5. Agent jobs: every agent launches its AI-free computations as its own backg
-round script with `lowprio.py` (10 GB cap),
-  references\00-new-model-playbook.md:722:## Checklist additions from 2026-10-25 (the case-study model m21d -> m21p/m21
-f; see pitfalls L38-L54)
-  references\00-new-model-playbook.md:723:1. S0 scope: capture the model's store page (WebFetch) + every gallery sheet
-into <build>/reference/, run scripts/workflows/feature_gap_audit.js, ask which advertised items are out of scope (L39).
-  references\00-new-model-playbook.md:724:2. Perf from day one: collision proxies <= the best shipped (QEM, proxy_devia
-tion gate), hidden variants register no per-frame work, cost_gate.py PASS before any in-game test (L40, L48, L53); zero
--loss rules in SKILL.md; design help: scripts/workflows/zero_loss_perf_design.js.
-  references\00-new-model-playbook.md:725:3. Garments: export at the artist's render subdivision (or level 1 + level-2
-normal bake), artist garment weights, no per-vertex fit on hard surfaces, slider shapes transferred (L52).
-  references\00-new-model-playbook.md:726:4. Skin: artist maps 1:1, no relief gain/cavity/speckle (L46); calibrate albe
-do for the game's tonemapper (L50); overlay shells over painted decals are dropped (L49); no tiny shared TransparencyMa
-ps (L43).
-> references\00-new-model-playbook.md:727:5. Voice: shipped codec (FSB5 Vorbis via Unity FSBTool, mono 48 kHz), Decompr
-essOnLoad for lip-sync (L51).
-  references\00-new-model-playbook.md:728:6. Rig: clone stems with tfa_clone_rename.py + stem_check gate, BepInEx conso
-le off, BelowNormal + 30 fps idle cap, prio_guard for measured windows (L41, L42).
-  references\00-new-model-playbook.md:729:7. Release: the .tfa must work on a clean unmodded install; plugins (portrait
- tile, TfaFit) are optional extras (SKILL.md RELEASE RULE).
-  references\00-new-model-playbook.md:730:
-  references\00-new-model-playbook.md:731:## READ FIRST, part 2: lessons of 2026-10-26 evening (model-agnostic; the cas
-e-study model numbers only as examples)
-  references\00-new-model-playbook.md:732:1. Release gate = in-game proof on the REAL file + clean-install (vanilla) sm
-oke PASS + side-by-side vs the current release. Never on lab numbers.
-> references\00-new-model-playbook.md:733:2. The game's strip-nude is Lua `CustomizeAll(99)` = every slider to its LAST
- step; spawn/dress = step 0. Make every clothing slider's last step "off" and hair's last step "full hair" (assembler c
-fg `strip_safe_sliders`, `slot_last`, `outfit_order`; duplicate steps keep saved indices valid).
-> references\00-new-model-playbook.md:734:3. Small release fixes WITHOUT a rebuild: edit the finished bundle. `scripts/
-bundle_customize_frames.py` copies one slider step onto others (e.g. disable broken looks); `own/bonecloth/jiggle/neck_
-stem.py`-style tools swap one cloth patch's data objects. The bundle stem = output file name.
-  references\00-new-model-playbook.md:735:4. NEVER reuse a build tag: the build step skips an existing out_builds/shion
-_<tag>.tfa ("bundle + rig copy") - fixes silently missing. Move the old file / report dir / rig copy aside or use a new
- tag.
-  references\00-new-model-playbook.md:736:5. The rig game caches the first loaded bundle of a stem: after any rebuild u
-nder the same name restart the rig before smoke / LOOK shots.
-  references\00-new-model-playbook.md:737:6. Rig stems lower-case only (container key assets/girls/<stem>.prefab must b
-e lower case; mixed case = CreateHuman NRE + endless black fade). stem_check is case-exact now.
-  references\00-new-model-playbook.md:738:7. Hide lists only cover STANDARD body vertex ids; a subdivided body has most
- vertices without one (the case-study model: 79 %, belly 97 %), so they are never hidden under garments/suits -> poke-t
-hrough. Extension ids fix it but break cross-wear on clean installs (ArgumentOutOfRange) - fix poke-through geometrical
-ly (cover / push) instead.
-  references\00-new-model-playbook.md:739:8. Changing which parts an outfit look shows (e.g. robot limbs off) needs the
- look's fit shapes / XHide / clip-fix weights re-solved; otherwise limbs collapse to spiky sticks and thighs balloon. G
-ate it with a front full-body shot of a REAL build.
-> references\00-new-model-playbook.md:740:9. MeshCloth patch density: a coarse patch (e.g. throat 165 particles) drifts
- mm off the skin while its border is pinned = a dark step line (secondary: the usual dark line at the head/torso border
- is the missing _MainTexLayer bridge, references/27-shaders.md#gap-130); match the shipped particle count. But a denser
- breast patch needs a retuned spring (it sagged/lumped) - tune density and spring together, judge in clothes AND nude.
-  references\00-new-model-playbook.md:741:10. Harness isolation by toggling objects is void for slider-driven objects (
-the Customize clip re-applies m_IsActive / m_Enabled every frame). Use clip edits or a pixel-pick (object-ID render) to
-ol to find which renderer draws a pixel.
-  references\00-new-model-playbook.md:742:11. Camera: keep the camera inside the studio spot's clear circle and widen t
-he lens instead of backing off; disable the harness wall-avoidance there ("collide": false); pass the fov on the camsho
-t itself (the game camera eases/clamps FOV()); start every shot with {"cmd":"clean"} (fluid/paint blotches read as "shi
-ne"/"wet").
-  references\00-new-model-playbook.md:743:12. Showcase like the model's reference sheets: one figure per reference figu
-re in the same order, same light/backdrop, relaxed stance (the game's own MenuPose from Mods/Scripts/Welcome/welcome_po
-ses.lua with hanging arms), back views turn the ACTOR (camera yaw is actor-relative), page sheets with the page title.
-  references\00-new-model-playbook.md:744:13. Operations: release dead game-lock owners after stopping runners; never p
-ut a process-match pattern literally in your own kill/check command (self-match kills your shell); kill leftover `tail
--F`/`grep` monitor pipelines (console exhaustion -> 0xC0000142); never edit a running bash script; py_compile after eve
-ry scripted patch.
-  references\00-new-model-playbook.md:745:
-  references\00-new-model-playbook.md:746:<!-- BEGIN GAP-REVIEW v1.1 -->
-  references\00-new-model-playbook.md:747:## Knowledge added in v1.1 (gap review)
-  references\00-new-model-playbook.md:748:
-  references\00-new-model-playbook.md:749:Facts consolidated from the first import's proof notes, gap study and the rev
-erse-engineering index; every item also has a learning record. Decompiled code is never quoted: re-derive it locally wi
-th `python tools/diag_decompile.py <Class.Method>` (docs/DIAGNOSIS.md).
-  references\00-new-model-playbook.md:750:
-  references\00-new-model-playbook.md:751:<a id="gap-005"></a>
-  references\00-new-model-playbook.md:752:### GAP-005 - Slider architecture: one slider per part group instead of a pre
-set Outfit slider, with a reachability gate (high)
-  references\00-new-model-playbook.md:753:
-> references\00-new-model-playbook.md:754:A single Outfit slider of fixed presets that bundle jacket, pants, top, botto
-m and armour/robot parts makes many reference combinations impossible (on the first import only the last preset removed
- the armour), and quick 'plain body' presets collapse limbs because the clip-fix data was solved with the parts on (00a
- L89). Plan one slider per part group from the start (e.g. Jacket, Pants, Top, Bottom, Armour full / limbs only / off),
- each owning disjoint objects; step 0 = the default look and the last step = off (strip-safe for CustomizeAll(99)); eve
-ry blend-shape key has exactly one owner slot (decompose union keys, list conjunction approximations); visibility that
-depends on two slots uses m_IsActive from one slot and the renderer's m_Enabled from the other; solve or re-key the cli
-p fix per (garment x armour state), hold the armour-fit body keys per armour step, and gate every reference figure in g
-ame on a real build. 00a L93-L96 documents this as a retrofit, but the playbook still plans an outfit-preset slider. Se
-cond pass (gap study): shipped reference design - each garment has its own 2-3 step slider, a step changes at most 8 ob
-jects, 136 of 143 characters have no duplicate step and the 5 references have no unreachable renderer. Gate from the Cu
-stomize clips: a renderer is reachable if some frame (or the prefab default when unkeyed) has both m_IsActive and m_Ena
-bled on; count the objects changed per step and the identical steps; list GameObjects keyed by several clips and give e
-ach one owning clip (the docs disagree on how several clips combine: 19 l.417 says the game ANDs m_IsActive over clips,
- 37 l.148 counts OR for cost bounds, the gap study saw the last sampled clip win; settle it with one in-game test). The
- playbook part 2 item 2 (l.736) keeps duplicate steps on purpose so saved slider indices stay valid: report identical s
-teps and allow only those. The Clothes panel was observed to list Customize sliders in reverse order of the Animation c
-omponent's clip list, so order the list so the main sliders show first (confirm with REA on the panel builder); keep sl
-iders at <= 4-8 steps with a step legend in the README and 'off' last; gate that every reference-sheet look is reachabl
-e with slider settings and that all sliders at max give nude + hair.
-  references\00-new-model-playbook.md:755:
-> references\00-new-model-playbook.md:756:- **Check:** 00a L89 and L93-L96 (2026-11-01) cover the retrofit; 00-new-mode
-l-playbook l.132, 194, 208, 525, 559, 566 and 629 still plan outfit presets. Second pass: no reachability, objects-per-
-step or identical-step gate and no Clothes-panel order rule in any reference (grep: reachab, panel order, owning clip:
-0 relevant hits); the playbook l.736 keeps duplicate steps for saved indices; 19 l.417 (AND over clips) and 37 l.148 (O
-R) disagree on objects keyed by several clips.
-  references\00-new-model-playbook.md:757:- **Related:** `references/00a-pitfalls.md`, `references/47-customize-sliders
-.md`, `references/19-unity-lab-and-live-harness.md`, `references/37-zero-loss-performance.md`
-  references\00-new-model-playbook.md:758:- **Evidence:** case-study notes (not shipped)
-  references\00-new-model-playbook.md:759:- **Record:** `learnings/records/GAP-005.json`
-  references\00-new-model-playbook.md:760:
-  references\00-new-model-playbook.md:761:<a id="gap-104"></a>
-  references\00-new-model-playbook.md:762:### GAP-104 - Dependency lanes for a multi-fix release train (medium)
-  references\00-new-model-playbook.md:763:
-> references\00-new-model-playbook.md:764:Plan dependent fixes in lanes around shared resources and keep each lane sequ
-ential: the skin atlas (genital grade -> item-base blends -> detail -> new textures), the Body_ vertex set (shape -> ji
-ggle pivots/patch density -> hole sculpts -> perf decimation LAST, since it remaps every sidecar), Colliders/Body (cage
- edits -> uv1 copy -> density), Customize clips (slider split -> fit-key rules -> new garments/cloth). Each in-game can
-didate = the installed build + one kind of change, gated by the install gates plus the defect's own before/after pair.
-  references\00-new-model-playbook.md:765:- **Related:** `references/36-build-chain-gates-and-proxy-budget.md`
-  references\00-new-model-playbook.md:766:- **Evidence:** case-study notes (not shipped)
-  references\00-new-model-playbook.md:767:- **Record:** `learnings/records/GAP-104.json`
-  references\00-new-model-playbook.md:768:<!-- END GAP-REVIEW v1.1 -->
-  references\00d-cookbook.md:206:Run: `run --stage S9 --execute` → `own_suit_v2.py <body_cfg> <own_dir> body skin --ba
-ke <bake_dir>`.
-  references\00d-cookbook.md:207:Check: shell vertices > 0, NaN 0. the case-study model: 35 119 v, 65 756 tris, rim 9 3
-28 tris, 23 548 hidden body vertices, 71 s.
-  references\00d-cookbook.md:208:**S9-AI [AI]** look at the proof png: acceptable = smooth border following the materia
-l mask, visible rim, genitals covered
-  references\00d-cookbook.md:209:like the model's suit. Jagged border or holes → FAIL.
-  references\00d-cookbook.md:210:
-> references\00d-cookbook.md:211:### S10–S12 — canonical map, face clips, voice, bone cloth, clip fix `[AUTO]`, not d
-river stages yet
-> references\00d-cookbook.md:212:Run by hand from playbook §4 S10–S12 (`own_canonical_map.py`, `extract_face_control_
-clips.py` once per game build,
-> references\00d-cookbook.md:213:`own_voice.py`, `own_bonecloth.py`, `own_cloth_colliders.py`). The assembler reads the
-ir outputs through assemble_cfg keys.
-  references\00d-cookbook.md:214:
-  references\00d-cookbook.md:215:### S13 — assemble `[AUTO]`
-  references\00d-cookbook.md:216:Run: `run --stage S13 --execute` → `assemble_own.py <assemble_cfg.json>`; the driver
-refuses it on an unverified game
-  references\00d-cookbook.md:217:build (playbook §10) and proves the bundle changed (mtime) before copying it to `out_
-builds/`.
-> references\00d-cookbook.md:218:Check: skeleton world error ≤ 0.01 mm, face pose frame 0 ≤ 0.1 mm, every cloth patch
- rest error ≤ 1e-9 m and
-> references\00d-cookbook.md:219:≤ 15 triangles per vertex and ≤ 15 weights (MagicaCloth reads only 4 bits of the tri
-angle count: 16+ breaks normals,
-> references\00d-cookbook.md:220:references/13 §1.3), 7 penis cloth colliders, 29 face-control clips, 5 points per hol
-e, no warnings, no missing outfit item.
-> references\00d-cookbook.md:221:the case-study model m20 (2026-10-18): 355 241 202 B, 2 718 objects; skeleton 2.2e-5 m
-m, face 0.0303 mm, **FAIL cloth.Ass 19 triangles per
-  references\00d-cookbook.md:222:vertex** (earlier build 10) — a real defect of m20 (00a D20).
-  references\00d-cookbook.md:223:
-  references\00d-cookbook.md:224:### S14 — validator + fulldiff gate `[AUTO]` + `[AI]` triage
-  references\00d-cookbook.md:225:Run: `run --stage S14 --execute` → `tfa_validate.py <tfa> --json`, `prefab_fulldiff.p
-y <tfa> <clean succubus> <clean queen>
-  references\00d-cookbook.md:226:<clean primrose> --out <reports>/fulldiff --ours-name <stem>`, `review/fulldiff_multi.
-py` (official + community groups).
-  references\00d-cookbook.md:227:Check: validator errors beyond the 3 by-design own-body errors = 0; fulldiff contract
-rows 0, missing components 0 (Boots
-  references\00d-cookbook.md:228:allowlisted), unreviewed live rows 0. the case-study model m20: validator 3 by-design
-errors (bind poses 126.17 mm, standard patches,
-  references\00d-cookbook.md:229:collision distance 6.27 mm; rc 1 by design; 38.7 s); fulldiff (vs tifa + modded succub
-us/queen) 39 contract, 28 missing,
-  references\00d-cookbook.md:230:242 live → FAIL (00a D1/D2/D4: `prefab.py` re-enables disabled components).
-  references\00d-cookbook.md:231:**S14-AI [AI]** for each live row open `<reports>/fulldiff/FULLDIFF.md`: acceptable an
-swers per row = (a) "per-character value,
-  references\00d-cookbook.md:232:ours derived from the model" (write it to `allow.json` with that reason) or (b) "defec
-t" (fix the generator). Contract rows are
-  references\00d-cookbook.md:233:never allowlisted.
-  references\00d-cookbook.md:261:Run: `run --stage S17 --execute` → `ingame_test/harness_client.py --out <dir> --cmds
-<batch.json>` per batch in
-  references\00d-cookbook.md:262:`configs.ingame_batches` (game started once with `run_ingame_test.py --serve`; protoco
-l: playbook §6, `live_protocol.py`).
-  references\00d-cookbook.md:263:Check: no exception / Unity error in any batch, ≥ 1 shot, 0 black/flat shots. the cas
-e-study model m20 auto capture: 1 batch, 89 shots,
-  references\00d-cookbook.md:264:0 unusable.
-  references\00d-cookbook.md:265:**S17-AI [AI]** for every contact sheet answer per shot (all must be yes): our charact
-er (not the primrose fallback)?
-> references\00d-cookbook.md:266:holes visible and opening in penetration shots? no blades, spikes or detached parts? c
-lothes and shoes on the body, feet on
-  references\00d-cookbook.md:267:or just above the floor? expressions move (face batch)? same quality as the official c
-haracter in the paired shot?
-  references\00d-cookbook.md:268:Write `review.json` (`{"<shot>": {"ok": true/false, "why": "..."}}`).
-  references\00d-cookbook.md:269:
-  references\00d-cookbook.md:270:### S18 — source-model benchmark `[AUTO]` + `[AI]` (benchmark models only; mandatory
-before any bulk install)
-  references\00d-cookbook.md:271:A benchmark model is the source of a shipped character (00c §6 table) with model.json
-  references\00d-cookbook.md:272:`"benchmark": {"shipped": "<clean install>/Mods/Characters/<name>.tfa", "shipped_name"
-: "<name>"}` and stem `<name>_bench`.
-  references\00d-cookbook.md:273:Run: `run --stage BENCH --execute` → `prefab_fulldiff.py <ours> <pair>`, `tfa_shipped
-_lib.py` on ours and the pair.
-  references\00d-cookbook.md:274:Check (`check --stage S18`): 0 contract rows, 0 missing components vs the pair, textur
-e resolution per role ≥ pair, detail
-  references\00d-cookbook.md:275:≥ 0.9 × pair, A/B shots present. No benchmark has passed yet (2026-10-18).
-  references\00d-cookbook.md:276:
-  references\00d-cookbook.md:277:### REVIEW — final look review `[AI]`: as S17-AI over all batches; then the report (s
-ection 6).
-  references\00d-cookbook.md:278:
-  references\00d-cookbook.md:283:| CFG stage for non-CloudRig rigs (FK controls, IK props, skin map rules) | needs read
-ing the rig's controls and constraints | rig-family profiles in `data/` |
-  references\00d-cookbook.md:284:| more than 4 UDIM tiles / several skin materials beyond body+head | atlas packing ass
-umes a 2×2 grid (00b A10/A37) | an N-tile atlas layout |
-  references\00d-cookbook.md:285:| "other" shape keys (D9) | meaning only visible by setting the key in Blender | a Ble
-nder script that renders each key's effect |
-  references\00d-cookbook.md:286:| fulldiff live-row triage (S14-AI) | per-field meaning needs the game code (reference
-s/13, 22) | per-field rules learned from the official characters |
-  references\00d-cookbook.md:287:| re-verification after a game update (playbook §10, AI part) | REA/Ghidra work on mi
-d-function addresses | signature matching |
-> references\00d-cookbook.md:288:| S10–S12 integration (voice, bone cloth, clip fix) | not driver stages yet | driver
-stages + checks |
-  references\00d-cookbook.md:289:| look quality vs the shipped pair (S17/S18 AI) | judgment | A/B image metrics per fra
-me |
-  references\00d-cookbook.md:290:
-  references\00d-cookbook.md:291:## 6. Final report (copy this list, fill every line)
-  references\00d-cookbook.md:292:output path + md5 of the `.tfa`; model.json + every config path; decisions.json (D1–D
-10 with CONFIDENT/UNSURE); the
-  references\00d-cookbook.md:293:rig mapping table (slots → bones); every `check --stage` RESULT line; validator + ful
-ldiff + Unity + in-game gate verdicts;
-  references\00d-cookbook.md:294:in-game log excerpt and contact-sheet paths; every FAIL that remains with its 00e row;
- what was expert-only and skipped.
-  references\00d-cookbook.md:295:
-  references\00d-cookbook.md:296:| perf: prune never-shown renderers + BC4 scalars | LAST step of any edit chain: bash
-scripts/perf103_apply.sh in.tfa out.tfa (bundle_prune_dead.py + bundle_tex_bc4.py; idempotent); offline budget: scripts
-/budget_facts.sh + budget_offline_report.py; recipe + numbers: references/37 section 14 |
-  references\00d-cookbook.md:297:
-  references\00d-cookbook.md:298:<!-- BEGIN GAP-REVIEW v1.1 -->
-  references\00d-cookbook.md:299:## Knowledge added in v1.1 (gap review)
-  references\00d-cookbook.md:300:
-  references\00d-cookbook.md:301:Facts consolidated from the first import's proof notes, gap study and the reverse-engi
-neering index; every item also has a learning record. Decompiled code is never quoted: re-derive it locally with `pytho
-n tools/diag_decompile.py <Class.Method>` (docs/DIAGNOSIS.md).
-  references\00d-cookbook.md:302:
-  references\00d-cookbook.md:303:<a id="gap-011"></a>
-  references\00d-cookbook.md:304:### GAP-011 - QA and diagnosis helpers cited by the references live only in work folde
-rs (medium)
-  references\00d-cookbook.md:305:
-> references\00d-cookbook.md:306:Besides the perf and rig tools, the references cite helpers that are kept only in work
- folders: tongue_probe.py (tongue tip vs incisors and lip plane per face pose, by FaceRig emulation, for any .tfa; 00a)
-, overlap_check.py (32-face-expressions), ingame_replay.py (pins replays to one build's capture folder, because the tes
-ter keeps only the latest build per pose; 32-skinning-repair) and nre_control_batches.py (clothing-swap NRE control bat
-ches for the clean rig; 00a, 25-cross-wear). Copy them into scripts/ with model names and paths as arguments, or the re
-cipes that cite them cannot be rerun.
-  references\00d-cookbook.md:307:- **Evidence:** case-study notes (not shipped); references/00a-pitfalls.md l.157 and l
-.884; 32-face-expressions.md l.309; 32-skinning-repair.md l.415; 25-cross-wear.md l.547
-  references\00d-cookbook.md:308:- **Record:** `learnings/records/GAP-011.json`
-  references\00d-cookbook.md:309:
-  references\00d-cookbook.md:310:<a id="gap-012"></a>
-  references\00d-cookbook.md:311:### GAP-012 - Undocumented bundle-edit and texture scripts (medium)
-  references\00d-cookbook.md:312:
-> references\00d-cookbook.md:313:Document in 00d (edits of a finished bundle) and in 34-body-skin-bake: bundle_copy_mes
-hcloth.py (copies one MagicaMeshCloth patch's clothParams + vertexDepthList from a donor .tfa without a rebuild; --para
-ms-only when the particle sets differ), bundle_set_blendshape_hold.py (changes a held blend-shape weight in a finished
-.tfa), check_patch_merge.py (soft-tissue patch merge vs the runtime rules), bake_compare.py (bake determinism), tex_bin
-_to_png.py (decodes own_textures payloads to what the game samples at mip 0), detail_patch_from_texture.py, own_cavity_
-from_normal.py (depth for painted relief) and own_tex_adjust.py (re-grade to measured in-game targets).
-  references\00d-cookbook.md:314:- **Related:** `references/34-body-skin-bake.md`
-> references\00d-cookbook.md:315:- **Evidence:** scripts/ root: bundle_copy_meshcloth.py, bundle_set_blendshape_hold.py
-, check_patch_merge.py, bake_compare.py, tex_bin_to_png.py, detail_patch_from_texture.py, own_cavity_from_normal.py, ow
-n_tex_adjust.py (module docstrings)
-  references\00d-cookbook.md:316:- **Record:** `learnings/records/GAP-012.json`
-  references\00d-cookbook.md:317:<!-- END GAP-REVIEW v1.1 -->
+  scripts\assemble_own.py:24:DEF = {k: v["fields"] for k, v in json.load(open(CFG["class_defaults"])).items()}
+  scripts\assemble_own.py:25:w = TfaWriter(STEM, CFG["types_cs"])
+> scripts\assemble_own.py:26:w.track = bool(CFG.get("prune_orphans"))                          # cfg prune_orphans "report
+" | "drop": remember every object's PPtr targets for the orphan scan before the save (zero-loss plan P31)
+  scripts\assemble_own.py:27:P = Prefab(w)
+  scripts\assemble_own.py:28:sk = json.load(open(os.path.join(OWN, "skeleton.json")))
+  scripts\assemble_own.py:29:# optional per-build overrides (mix new parts into a build without copying the whole own dir)
+:
+  scripts\assemble_own.py:54:        add = fz.get(k, np.zeros((nf, 3), np.float32))
+  scripts\assemble_own.py:55:        body[k] = np.concatenate([body[k], add.astype(body[k].dtype)])
+> scripts\assemble_own.py:56:    REPORT_FUTA = {"futa_vertices": nf, "body_vertices_with_futa": n0 + nf}
+  scripts\assemble_own.py:57:else:
+> scripts\assemble_own.py:58:    REPORT_FUTA = {"futa_vertices": 0}
+  scripts\assemble_own.py:59:if CFG.get("body_uv1_npz"):                                        # non-overlapping uv1 over
+ the final Body_ (texture baker)
+  scripts\assemble_own.py:60:    _u1 = np.load(CFG["body_uv1_npz"])["UV1"]
+  scripts\assemble_own.py:61:    if len(_u1) != len(body["V"]):
+  scripts\assemble_own.py:62:        raise SystemExit(f"body_uv1_npz has {len(_u1)} rows, Body_ has {len(body['V'])} verti
+ces")
+  scripts\assemble_own.py:63:    body["UV1"] = _u1.astype(body["UV1"].dtype)
+> scripts\assemble_own.py:64:    REPORT_FUTA["body_uv1"] = CFG["body_uv1_npz"]
+  scripts\assemble_own.py:65:holes = json.load(open(CFG.get("holes_json") or os.path.join(OWN, "holes_geometry.json")))
+> scripts\assemble_own.py:66:REPORT = {"objects": {}, "checks": {}}
+  scripts\assemble_own.py:67:# [m21a integration] clip fix (own/clip_fix/INTEGRATION.md, scripts/clip_fix_integrate.py). c
+fg "clip_fix_dir" (absent = every
+  scripts\assemble_own.py:68:# CF hook below is a no-op): InnerMesh + Mask_* collapse shapes on Body_ (refuses data made f
+or another Body_), per-item push
+  scripts\assemble_own.py:69:# lists / decimated collision meshes / garment weights, suit SuitFit_* retraction shapes, D13
+ cross-slot item keys.
+  scripts\assemble_own.py:79:CF.apply_body(body)
+  scripts\assemble_own.py:80:if CF.on:
+> scripts\assemble_own.py:81:    REPORT["clip_fix"] = CF.report
+  scripts\assemble_own.py:82:# skin repair (own/skin_fix, references/32-skinning-repair.md): no-op without cfg "skin_repai
+r_rules"
+  scripts\assemble_own.py:83:from skin_repair import SkinRepairHook
+  scripts\assemble_own.py:84:SR = SkinRepairHook(CFG, os.path.join(OWN, "skeleton.json"))
+> scripts\assemble_own.py:85:SR.body(body, REPORT_FUTA.get("futa_vertices", 0))                 # before BONES = list(body
+["BONES"])
+  scripts\assemble_own.py:86:# budgeted collision proxies (cfg proxy_budget, absent = old behaviour; scripts/proxy_budget.
+py, perf: own/perf_study/cost_model.md §3.1):
+  scripts\assemble_own.py:87:# the game re-cooks the proxy of EVERY AdvancedCollider every frame (hidden slots too) -> tri
+angles of all proxies = frame time
+  scripts\assemble_own.py:88:PBUD = CFG.get("proxy_budget")
+  scripts\assemble_own.py:89:PB_NO_COLLIDER = []                                                # items that got no Advanc
+edCollider (proxy_budget.no_collider_if_empty)
+> scripts\assemble_own.py:90:PB_SLOTS = {}                                                      # collider slot -> {"tris"
+, "verts", "display_verts"} (REPORT proxy_budget)
+  scripts\assemble_own.py:91:if PBUD:
+  scripts\assemble_own.py:92:    import proxy_budget as PB
+  scripts\assemble_own.py:93:    PB.PER_SUB["on"] = bool(PBUD.get("per_submesh"))                 # perf plan D1 (a): one
+proxy submesh per display submesh carrying the display's Material objects (wetness / paint contract)
+> scripts\assemble_own.py:94:PB_WET = {}                                                        # slot -> per-submesh area
+ report of the proxy (REPORT proxy_wetness)
+  scripts\assemble_own.py:95:
+  scripts\assemble_own.py:96:
+  scripts\assemble_own.py:97:def proxy_subs(cm):
+  scripts\assemble_own.py:193:EYELID_WRAPPER_PATH = {v: k for k, v in WRAP_MADE.items()}                 # "L_Upper_Eyelid
+++" -> prefab path
+  scripts\assemble_own.py:194:W_rest = {n: P.world(p) for n, p in SPATH.items()}
+> scripts\assemble_own.py:195:REPORT["checks"]["skeleton_max_world_err_mm"] = max(
+  scripts\assemble_own.py:196:    float(np.abs(W_rest[n][:3, 3] - np.array(T[n]["world"])[:3, 3]).max()) * 1000 for n in T
+ if n not in FMT and n not in BWO)
+> scripts\assemble_own.py:197:if BWO:                                                            # intended relocation (bo
+ne_world_overrides), reported separately
+> scripts\assemble_own.py:198:    REPORT["bone_world_overrides_moved_mm"] = {n: round(float(np.linalg.norm(W_rest[n][:3, 3
+] - np.array(T[n]["world"])[:3, 3])) * 1000, 2)
+  scripts\assemble_own.py:199:                                               for n in T if n in BWO}
+  scripts\assemble_own.py:200:if FMT:                                                            # intended relocation of
+the foot contact markers (sim targets)
+> scripts\assemble_own.py:201:    REPORT["foot_markers_moved_mm"] = {n: round(float(np.linalg.norm(W_rest[n][:3, 3] - np.a
+rray(T[n]["world"])[:3, 3])) * 1000, 2)
+  scripts\assemble_own.py:202:                                       for n in T if n in FMT}
+  scripts\assemble_own.py:203:bone_tr = lambda n: P.tr(SPATH[n])
+  scripts\assemble_own.py:204:# =============================================================================== hair locks
+ (own_hair_locks.py, references/23 §8)
+  scripts\assemble_own.py:209:    import own_hair_locks
+  scripts\assemble_own.py:210:    HL = own_hair_locks.add_bones(CFG["hair_locks_dir"], P=P, spath=SPATH, w_rest=W_rest)
+> scripts\assemble_own.py:211:    REPORT["hair_locks"] = {"bones": len(HL["bones"]), "max_world_err": HL["max_world_err"],
+ "meshes": {}}
+  scripts\assemble_own.py:212:
+  scripts\assemble_own.py:213:# =============================================================================== shaders /
+textures / materials
+  scripts\assemble_own.py:214:def shader(name):
+  scripts\assemble_own.py:228:    from shader_embed import load_shader, embed
+  scripts\assemble_own.py:229:    SH["StandardAdvanced"] = embed(w, load_shader(CFG["embed_shaders"]["StandardAdvanced"],
+"StandardAdvanced"))
+> scripts\assemble_own.py:230:    REPORT["embedded_game_shader"] = {"StandardAdvanced": os.path.basename(CFG["embed_shader
+s"]["StandardAdvanced"])}
+  scripts\assemble_own.py:231:else:
+  scripts\assemble_own.py:232:    SH["StandardAdvanced"] = shader("StandardAdvanced")
+  scripts\assemble_own.py:233:
+  scripts\assemble_own.py:275:              "image data": data, "m_StreamData": {"offset": 0, "size": 0, "path": ""}})
+  scripts\assemble_own.py:276:    w.fill(pid, t)
+> scripts\assemble_own.py:277:    REPORT["objects"][name] = {"format": meta["format"], "size": meta["width"], "MB": round(
+len(data) / 2 ** 20, 1)}
+> scripts\assemble_own.py:278:    REPORT.setdefault("tex_sources", {})[name] = os.path.dirname(tex_file(name, ".bin")).rep
+lace("\\", "/")      # which tex_dirs entry served it (first match): the queue's post-build check compares it with the dir
+s it chose
+  scripts\assemble_own.py:279:    return pid
+  scripts\assemble_own.py:280:
+  scripts\assemble_own.py:281:
+  scripts\assemble_own.py:341:    _mn_f = {"_MULTI_NORMALS": float(_mn.get("slider", 1)), "_MultiNormalsWeight": float(_mn
+.get("weight", 0.27))}
+  scripts\assemble_own.py:342:    _mn_kw = ("_MULTI_NORMALS",)
+> scripts\assemble_own.py:343:    REPORT["skin_multinormal"] = dict(_mn)
+  scripts\assemble_own.py:344:MAT_TORSO = material(f"{CFG['display_name']}_Torso", "Unified", dict(torso_tex, **_mn_tex),
+dict(skin_f, _IS_BODY=0.0, **_skin_boost, **_mn_f),
+  scripts\assemble_own.py:345:                     skin_c, keywords=("_ISWET_ON", "_HIDEVERTEXALPHA_ON") + _mn_kw)
+  scripts\assemble_own.py:346:MAT_HEAD = material(f"{CFG['display_name']}_Head", "Unified", skin_tex, dict(skin_f, _IsColo
+red=1.0, _SubsurfaceID=1.0, **_skin_boost),
+  scripts\assemble_own.py:382:        SHAPES_BODY.append(_k)
+  scripts\assemble_own.py:383:        body["SHAPE__" + _k] = np.zeros_like(body["V"])
+> scripts\assemble_own.py:384:    REPORT["garment_only_keys_on_body"] = {"zero_shapes_added_to_Body_": len(GARMENT_KEYS)}
+  scripts\assemble_own.py:385:GARMENT_SET = set(GARMENT_KEYS)
+  scripts\assemble_own.py:386:# cfg body_hold_shapes (absent = none): extra Body_ keys from body_npz held at a weight in t
+he prefab, e.g. the skinning
+  scripts\assemble_own.py:387:# agent's {"BreastRest": 100}. Patches carry the key too and
+  scripts\assemble_own.py:444:    t = build_mesh(w.default("Mesh"), name, V, N, TAN, COL, uvs, subs, BI, BW, BIND if bind
+is None else bind, shapes)
+  scripts\assemble_own.py:445:    w.fill(pid, t)
+> scripts\assemble_own.py:446:    REPORT["objects"][name] = {"vertices": int(len(V)), "triangles": int(sum(len(s) for s in
+ subs)),
+  scripts\assemble_own.py:447:                               "shapes": [s for s, _ in shapes]}
+  scripts\assemble_own.py:448:    if _keep is not None:
+> scripts\assemble_own.py:449:        REPORT["objects"][name]["bones"] = [_keep[1], int(len(_keep[0]))]
+  scripts\assemble_own.py:450:    return pid
+  scripts\assemble_own.py:451:
+  scripts\assemble_own.py:452:
+  scripts\assemble_own.py:507:                                                 body["UV2"], body["SHAPE__InnerMesh"], W_re
+st, _addr,
+  scripts\assemble_own.py:508:                                                 exclude=np.asarray(body["REGION"]) == "Peni
+s", ext_map=bool(CFG.get("hidefix")))
+> scripts\assemble_own.py:509:    REPORT["crosswear"] = XW["report"]
+  scripts\assemble_own.py:510:    if CFG.get("hidefix"):
+  scripts\assemble_own.py:511:        # cfg hidefix (2026-10-26, a requirement; absent = old behaviour): hide lists hold s
+tandard ids (< 28 915) mapped to ONE own
+  scripts\assemble_own.py:512:        # Body_ vertex each, so the ~71 k own vertices no standard id reaches were never hid
+den under any garment / suit / layer. Extended map
+  scripts\assemble_own.py:520:        _EXT = np.asarray(XW["_ext_of"], np.int64); _MAP = np.asarray(XW["map"], np.int64)
+  scripts\assemble_own.py:521:        HIDEFIX = {"lists": 0, "added_hidden": 0, "added_pushed": 0, "map_length": int(len(_
+MAP)), "k": int(_hf.get("k", 3)), "mm": float(_hf.get("mm", 6.0))}
+> scripts\assemble_own.py:522:        REPORT["hidefix"] = HIDEFIX
+  scripts\assemble_own.py:523:
+  scripts\assemble_own.py:524:        def hide_inherit(lst):
+  scripts\assemble_own.py:525:            ent = {int(e["vertId"]) for e in lst}
+  scripts\assemble_own.py:580:               weights=[_HOLD_W.get(s, 0.0) for s in SHAPES_BODY] if _HOLD_W else None)
+  scripts\assemble_own.py:581:if BODY_HOLD:
+> scripts\assemble_own.py:582:    REPORT["body_hold_shapes"] = BODY_HOLD
+  scripts\assemble_own.py:583:
+  scripts\assemble_own.py:584:# patches = exact duplicates of Body_ regions (+ one ring of neighbours as the fixed border)
+  scripts\assemble_own.py:585:reg = body["REGION"]
+  scripts\assemble_own.py:634:        patch_border[part] = np.asarray(own_holes_v3.patch_border_verts(
+  scripts\assemble_own.py:635:            V[vs], remap[tris], reg[vs], extra_regions=("BehindNeck",) if part == "Throat" e
+lse ()), np.int64)
+> scripts\assemble_own.py:636:REPORT["patches"] = {k: int(len(v)) for k, v in patch_ids.items()}
+> scripts\assemble_own.py:637:REPORT["futa"] = REPORT_FUTA
+> scripts\assemble_own.py:638:REPORT["cloth"] = {k: v["report"] for k, v in cloth_out.items()}
+> scripts\assemble_own.py:639:# gate (report only): MagicaCloth unpacks the per-vertex triangle count with 4 bits ((x >> 2
+4) & 0xF, references/13 §1.3):
+  scripts\assemble_own.py:640:# > 15 adjacent triangles on a virtual vertex = normal from a truncated fan. Fix by cloth_re
+duce_mm (m20 Ass 1.5 mm -> 19).
+  scripts\assemble_own.py:641:if cloth_out:
+> scripts\assemble_own.py:642:    REPORT["checks"]["cloth_max_tris_per_vertex"] = {k: v["report"].get("max_tris_per_vertex
+") for k, v in cloth_out.items()}
+> scripts\assemble_own.py:643:    REPORT["checks"]["cloth_tris_per_vertex_ok"] = all((n or 0) <= 15 for n in REPORT["check
+s"]["cloth_max_tris_per_vertex"].values())
+> scripts\assemble_own.py:644:    if CFG.get("cloth_valence_interior_ok") and not REPORT["checks"]["cloth_tris_per_vertex_
+ok"]:
+  scripts\assemble_own.py:645:        # cfg exception (lead, exact Ass welds): accept up to N over-15 virtual vertices per
+ patch when ALL their render
+  scripts\assemble_own.py:646:        # vertices are interior (canal/mouth inside, never seen; only that vertex normal use
+s 15 of its triangles)
+  scripts\assemble_own.py:647:        _int = set(CFG.get("cloth_valence_interior_regions", ["InsideVagina", "InsideAnus",
+"InsideMouth"]))
+> scripts\assemble_own.py:648:        _ov = {k: v["report"].get("over15", []) for k, v in cloth_out.items()}
+> scripts\assemble_own.py:649:        REPORT["checks"]["cloth_valence_exceptions"] = _ov
+> scripts\assemble_own.py:650:        REPORT["checks"]["cloth_tris_per_vertex_ok"] = all(
+  scripts\assemble_own.py:651:            len(lst) <= int(CFG.get("cloth_valence_interior_max", 2)) and all(e["regions"] a
+nd set(e["regions"]) <= _int for e in lst)
+  scripts\assemble_own.py:652:            for lst in _ov.values())
+  scripts\assemble_own.py:653:
+  scripts\assemble_own.py:678:        return TEXCACHE[name]
+  scripts\assemble_own.py:679:    if _tiny_transparency(name) and os.path.isfile(tex_file(name, ".json")):
+> scripts\assemble_own.py:680:        REPORT.setdefault("tiny_transparency_skipped", []).append(name)
+  scripts\assemble_own.py:681:        TEXCACHE[name] = None
+  scripts\assemble_own.py:682:        return None
+  scripts\assemble_own.py:683:    TEXCACHE[name] = texture(name) if os.path.isfile(tex_file(name, ".json")) else None
+  scripts\assemble_own.py:820:                 **({"raw_uv": True} if tag in SHARED["items"] else {}))   # shared texture
+set: raw UVMap
+  scripts\assemble_own.py:821:    if HL and ex["name"] in HL["meshes"]:                       # hair-lock skin; raises if
+the vertex order differs from the cut
+> scripts\assemble_own.py:822:        REPORT["hair_locks"]["meshes"][ex["name"]] = own_hair_locks.reskin(m, CFG["hair_lock
+s_dir"], ex["name"], known_bones=SPATH)
+  scripts\assemble_own.py:823:    if CF.on:
+  scripts\assemble_own.py:824:        CF.reweight(tag, m)                                         # clip-fix weights (fing
+erprint-checked); rigidify below wins
+  scripts\assemble_own.py:825:    if ex.get("mesh_npz"):                                          # face_v2 §8: fitted te
+eth (private build only)
+  scripts\assemble_own.py:831:    SR.mesh(ex["name"], m)                                          # skin repair (after rew
+eight / reskin / rigidify)
+  scripts\assemble_own.py:832:    if XW_STD is not None and not crosswear_bones.ANATOMY_RX.match(ex["name"]) and ex["name"
+] not in CFG.get("crosswear_body_features", []):
+> scripts\assemble_own.py:833:        REPORT.setdefault("crosswear_bones", {})[ex["name"]] = crosswear_bones.to_standard(m
+, XW_T, XW_STD, XW_KEEP)
+  scripts\assemble_own.py:834:    if ex["kind"] == "glow":
+  scripts\assemble_own.py:835:        m["SUBS"] = emissive_triangles(tag, m["UV0"], m["SUBS"])
+  scripts\assemble_own.py:836:        m["V"] = (m["V"] + m["N"] * 0.00015).astype(np.float32)        # 0.15 mm above the e
+yeball: no z-fighting
+  scripts\assemble_own.py:845:    EXTRA_SMR[ex["name"]] = smr(path, mp, mats, m["V"], root=ex.get("root", "DEF-Head"), bon
+es_tr=[bone_tr(b) for b in bnames])
+  scripts\assemble_own.py:846:    EXTRA_M[ex["name"]] = (tag, m, mp, mats, [bone_tr(b) for b in bnames])
+> scripts\assemble_own.py:847:    REPORT["objects"][f"{CFG['display_name']}_{ex['name']}"]["source"] = obj
+  scripts\assemble_own.py:848:    if ex.get("slot"):
+  scripts\assemble_own.py:849:        EXTRA_SMR[ex["name"]] = (EXTRA_SMR[ex["name"]], mp, mats, m["V"], [bone_tr(b) for b
+in bnames], ex["slot"])
+  scripts\assemble_own.py:850:
+  scripts\assemble_own.py:889:    kind_ = _sac_kind(suffix) if SAC else None
+  scripts\assemble_own.py:890:    if SAC and kind_ is None:
+> scripts\assemble_own.py:891:        REPORT.setdefault("warnings", []).append(f"suit_alpha_cut: variant '{suffix}' is in
+neither list: it keeps the bare region")
+  scripts\assemble_own.py:892:    if kind_ == "translucent" and not trans:
+  scripts\assemble_own.py:893:        raise SystemExit(f"suit_alpha_cut: variant '{suffix}' is listed as translucent but i
+s built opaque")
+  scripts\assemble_own.py:894:    if kind_ == "opaque" and trans:
+  scripts\assemble_own.py:900:        ms = cloth_material(f"{CFG['display_name']}_Bodysuit{suffix}", {k: v for k, v in tx_
+.items() if k != "SmoothnessMap"}, spec_gloss=None,
+  scripts\assemble_own.py:901:                            specular=float(_ev.get("specular", CFG.get("suit_specular", 0.0)
+)), smoothness_boost=float(_ev.get("smoothness", 0.55)))
+> scripts\assemble_own.py:902:        REPORT.setdefault("suit_t_even", {})[suffix] = {"smoothness": float(_ev.get("smoothn
+ess", 0.55)), "materials": 1}
+  scripts\assemble_own.py:903:        return [ms, ms]
+  scripts\assemble_own.py:904:    if trans:
+  scripts\assemble_own.py:905:        ms = material(f"{CFG['display_name']}_Bodysuit{suffix}", "Unified",
+  scripts\assemble_own.py:942:    SR.mesh("Bodysuit", sz)                                         # skin repair: suit weig
+hts from the repaired body                                               # clip-fix Mask_* copies (fingerprint-checked)
+  scripts\assemble_own.py:943:    if XW_STD is not None:                                          # suit face part -> head
+_base, no "Bone not found"
+> scripts\assemble_own.py:944:        REPORT.setdefault("crosswear_bones", {})["Bodysuit"] = crosswear_bones.to_standard(s
+z, XW_T, XW_STD, XW_KEEP)
+  scripts\assemble_own.py:945:    suit_bones = list(sz["BONES"])
+  scripts\assemble_own.py:946:    sbind = np.stack([np.linalg.inv(W_rest[b]) for b in suit_bones])
+  scripts\assemble_own.py:947:    sshapes = [(k[7:], sz[k]) for k in sz if k.startswith("SHAPE__") and (k[7:] in SHAPES_BO
+DY or (SUITV3 and k[7:].startswith("Sink_")))]   # follow Body_ shapes by name (+ v3 suit-only Sink_)
+  scripts\assemble_own.py:986:                                                                    # (cfg suit_variants_dro
+p, "hide clear looks for now")
+  scripts\assemble_own.py:987:            if not tex_if(v["tex_prefix"] + "_MainTex"):
+> scripts\assemble_own.py:988:                REPORT.setdefault("warnings", []).append("suit look texture missing " + v["t
+ex_prefix"]); continue
+  scripts\assemble_own.py:989:            mats_v = suit_v3_mats(v["tex_prefix"], "_" + v["name"], trans=bool(v.get("endo")
+) and bool(v.get("stipple")),
+  scripts\assemble_own.py:990:                                  even=bool(v.get("endo")) and bool(CFG.get("suit_t_even")))
+  scripts\assemble_own.py:991:            use_thin = bool(v.get("endo")) and THIN is not None
+  scripts\assemble_own.py:1027:        smr(f"{R}/FBX/FaceParts", MESH_FP, [SUIT["mats"][0]] * len([k for k in ("SUB0", "SU
+B1") if k in fpz and len(fpz[k])]),
+  scripts\assemble_own.py:1028:            fpz["V"], bones_tr=[bone_tr(b) for b in fp_bones])
+> scripts\assemble_own.py:1029:    REPORT["suit"] = {"vertices": int(len(sz["V"])), "hidden_body_vertices": len(SUIT["hide
+"]), "textures": sorted(suit_tex)}
+  scripts\assemble_own.py:1030:
+  scripts\assemble_own.py:1031:# =============================================================================== cornea (f
+ace_v2 INTEGRATION §5; cfg "cornea_npz", absent = none)
+  scripts\assemble_own.py:1032:# shipped construction (tifa/official): child "Cornea++" of each eye bone with MeshFilter +
+ MeshRenderer (not skinned) and a
+  scripts\assemble_own.py:1044:                          {"_Color": (1.0, 1.0, 1.0, 0.0392), "_EmissionColor": (0.0, 0.0,
+0.0, 1.0)},
+  scripts\assemble_own.py:1045:                          keywords=("_ALPHABLEND_ON",), queue=3000, tags=[("RenderType", "T
+ransparent")])
+> scripts\assemble_own.py:1046:    REPORT["cornea"] = {}
+  scripts\assemble_own.py:1047:    for _s, _bone in (("l", CFG.get("cornea_bone_l", "DEF-eye.l")), ("r", CFG.get("cornea_b
+one_r", "DEF-eye.r"))):
+  scripts\assemble_own.py:1048:        _path = f"{SPATH[_bone]}/Cornea++"
+  scripts\assemble_own.py:1049:        P.node(_path)
+  scripts\assemble_own.py:1061:                   "m_Materials": [pptr(MAT_CORNEA)]})
+  scripts\assemble_own.py:1062:        P.fill(_mr, _t)
+> scripts\assemble_own.py:1063:        REPORT["cornea"][_s] = {"bone": _bone, "vertices": int(len(_cz[f"V_{_s}"])), "trian
+gles": int(len(_cz[f"T_{_s}"]))}
+  scripts\assemble_own.py:1064:
+  scripts\assemble_own.py:1065:# =============================================================================== skin laye
+rs: stockings, pubes decal (own_layers.py)
+  scripts\assemble_own.py:1066:# cfg "layers_dir" (absent = old behaviour; own_v2/layers/INTEGRATION.md §2-3): stockings_
+shell.npz (slot Customize_Stockings,
+  scripts\assemble_own.py:1078:        SR.mesh(name, z)                                            # skin repair: "Stockin
+gs" / "Pubes"
+  scripts\assemble_own.py:1079:        if XW_STD is not None:                                      # no "Bone not found" o
+n transfer
+> scripts\assemble_own.py:1080:            REPORT.setdefault("crosswear_bones", {})[name] = crosswear_bones.to_standard(z,
+ XW_T, XW_STD, XW_KEEP)
+  scripts\assemble_own.py:1081:        bn = [str(b) for b in z["BONES"]]
+  scripts\assemble_own.py:1082:        subs_l = [z[k] for k in sorted(k for k in z if k.startswith("SUB") and k[3:].isdigi
+t()) if len(z[k])]
+  scripts\assemble_own.py:1083:        shp_l = [(k[7:], z[k]) for k in z if k.startswith("SHAPE__") and k[7:] in SHAPES_BO
+DY]   # follow Body_ shapes by name
+  scripts\assemble_own.py:1108:                            "hide": z["HIDE"].astype(int).tolist() if kind == "stockings" a
+nd "HIDE" in z else [],
+  scripts\assemble_own.py:1109:                            "z": z if PBUD else None, "subs": subs_l, "bn": bn}
+> scripts\assemble_own.py:1110:    REPORT["layers"] = {k: {"vertices": int(len(v["V"])), "hide": len(v["hide"])} for k, v
+in LAYER_OBJS.items()}
+  scripts\assemble_own.py:1111:    edir = os.path.join(CFG["layers_dir"], "endo")
+  scripts\assemble_own.py:1112:    if SUITV3 and SUIT and os.path.isdir(edir) and CFG.get("layer_endo", True) and any(v.ge
+t("endo") for v in SUIT_VARIANTS):
+  scripts\assemble_own.py:1113:        _dn = CFG["display_name"]
+  scripts\assemble_own.py:1144:        SS.finish_plan(OUTFIT)                                       # key ownership per ne
+w slot + m_Enabled AND rules
+  scripts\assemble_own.py:1145:    CF.apply_plan(OUTFIT)                                            # clip-fix Mask_* weig
+hts per option (no-op when off)
+> scripts\assemble_own.py:1146:    if CFG.get("strip_safe_sliders", True):    # a reported defects last step = full hair
+  scripts\assemble_own.py:1147:        _OFF = ("Off", "Bare", "Nude", "None")
+  scripts\assemble_own.py:1148:        for _sl in OUTFIT["slots"]:
+  scripts\assemble_own.py:1149:            _o = _sl["options"]
+  scripts\assemble_own.py:1158:                if _src is not None:
+  scripts\assemble_own.py:1159:                    _o.append(_copy.deepcopy(_src))
+> scripts\assemble_own.py:1160:        REPORT["strip_safe_sliders"] = {s_["slot"]: [o["name"] for o in s_["options"]] for
+s_ in OUTFIT["slots"]}
+  scripts\assemble_own.py:1161:    OUT_ITEMS = {}                                                   # model object -> {ite
+m, smr, mesh, mats, V, N, bones, hide}
+  scripts\assemble_own.py:1162:    HIDDEN0 = set()
+  scripts\assemble_own.py:1163:    if PROBE_STUB:                                                   # objects of a slot th
+at are not visible in the slot's first (default) option
+  scripts\assemble_own.py:1172:        bobj = "BAKED_" + obj
+  scripts\assemble_own.py:1173:        if bobj not in MB.man["objects"]:
+> scripts\assemble_own.py:1174:            REPORT.setdefault("outfit_missing", []).append(obj); continue
+  scripts\assemble_own.py:1175:        m = MB.build(bobj, key_names=CF.item_keys(obj, info["keys"], OUTFIT) if CF.on else
+(info["keys"] or None),   # + D13 cross-slot keys
+  scripts\assemble_own.py:1176:                     **({"raw_uv": True} if obj in SHARED["items"] else {}))   # shared tex
+ture set: raw UVMap
+  scripts\assemble_own.py:1177:        if CF.on:
+  scripts\assemble_own.py:1181:        SR.mesh(info["item"], m)                                    # skin repair: garment
+weights from the repaired body
+  scripts\assemble_own.py:1182:        if XW_STD is not None:                                      # no "Bone not found" o
+n transfer
+> scripts\assemble_own.py:1183:            REPORT.setdefault("crosswear_bones", {})[info["item"]] = crosswear_bones.to_sta
+ndard(m, XW_T, XW_STD, XW_KEEP)
+  scripts\assemble_own.py:1184:        bnames = m["BONES"]
+  scripts\assemble_own.py:1185:        bind_o = np.stack([np.linalg.inv(W_rest[b]) for b in bnames])
+  scripts\assemble_own.py:1186:        shapes_o = [(k[7:], m[k]) for k in m if k.startswith("SHAPE__")]
+  scripts\assemble_own.py:1208:        OUT_ITEMS[obj] = {"item": info["item"], "smr": smr_pid, "mesh": mp, "mats": mats, "
+V": m["V"], "bones": [bone_tr(b) for b in bnames],
+  scripts\assemble_own.py:1209:                          "hide": hide, "extra": False, "m": m}
+> scripts\assemble_own.py:1210:        REPORT["objects"][f"{CFG['display_name']}_{info['item']}"].update({"source": bobj,
+"hidden_body_vertices": len(hide), "kind": kind})
+> scripts\assemble_own.py:1211:    REPORT["outfit_slots"] = {s["slot"]: [o["name"] for o in s["options"]] for s in OUTFIT[
+"slots"]}
+  scripts\assemble_own.py:1212:
+  scripts\assemble_own.py:1213:# =============================================================================== data obje
+cts
+  scripts\assemble_own.py:1214:order = ["Breasts", "Mouth", "Ass", "Throat"]                   # bodyDeformerStartIdList o
+rder (game contract)
+  scripts\assemble_own.py:1233:        _cage_full = (len(cb["V"]), len(cb["TRI0"]) + len(cb["TRI1"]))
+  scripts\assemble_own.py:1234:        cb, _cage_rep = PB.reduce_cage(cb, int(PBUD["body_tris"]))
+> scripts\assemble_own.py:1235:        REPORT["proxy_budget_body"] = {"from_vertices": _cage_full[0], "from_triangles": _c
+age_full[1], "vertices": int(len(cb["V"])),
+  scripts\assemble_own.py:1236:                                       "triangles": int(len(cb["TRI0"]) + len(cb["TRI1"]))}
+  scripts\assemble_own.py:1237:    cb_bones = list(cb["BONES"]); col_bone_map = np.array([BONES.index(b) if b in BONES els
+e 0 for b in cb_bones], np.int64)
+  scripts\assemble_own.py:1238:    if any(b not in BONES for b in cb_bones):
+> scripts\assemble_own.py:1239:        REPORT.setdefault("warnings", []).append("collision body has bones missing from Bod
+y_: " + ",".join(b for b in cb_bones if b not in BONES))
+  scripts\assemble_own.py:1240:    col_BI = col_bone_map[cb["BI"].astype(np.int64)].astype(np.uint16)
+  scripts\assemble_own.py:1241:    col_uvs = {0: cb["UV0"], 1: cb["UV1"], 2: cb["UV2"]}
+  scripts\assemble_own.py:1242:    MESH_COL = mesh_object(f"{CFG['display_name']}_Collision_Body", cb["V"], cb["N"], cb["T
+AN"], cb["COL"], col_uvs,
+  scripts\assemble_own.py:1243:                           [cb["TRI0"], cb["TRI1"]], col_BI, cb["BW"], [])
+> scripts\assemble_own.py:1244:    n_disp = len(V) - REPORT_FUTA.get("futa_vertices", 0)
+  scripts\assemble_own.py:1245:    if "MAP_IDS" in cb:                                   # holes_v3 exact cage: Body_ ids
+(body first, then the futa piece)
+  scripts\assemble_own.py:1246:        reduced_to_full = cb["MAP_IDS"].astype(int).tolist()
+  scripts\assemble_own.py:1247:        assert max(reduced_to_full) < len(V), "MAP_IDS beyond Body_ (futa piece missing?)"
+  scripts\assemble_own.py:1251:    COL_V = cb["V"]
+  scripts\assemble_own.py:1252:    PB_SLOTS["Body"] = {"tris": int(len(cb["TRI0"]) + len(cb["TRI1"])), "verts": int(len(cb
+["V"])), "display_verts": int(len(V))}
+> scripts\assemble_own.py:1253:    REPORT["collision_body"] = {"vertices": int(len(cb["V"])), "triangles": int(len(cb["TRI
+0"]) + len(cb["TRI1"])),
+  scripts\assemble_own.py:1254:                                "max_map_dist_mm": round(float(np.linalg.norm(V[np.asarray(
+reduced_to_full)] - cb["V"], axis=1).max() * 1000), 4),
+  scripts\assemble_own.py:1255:                                "exact_map": "MAP_IDS" in cb}
+  scripts\assemble_own.py:1256:else:
+  scripts\assemble_own.py:1306:                _dropped = [int(_pe[s_].all(1).sum()) for s_ in _subs]
+  scripts\assemble_own.py:1307:                _subs = [s_[~_pe[s_].all(1)] for s_ in _subs]
+> scripts\assemble_own.py:1308:                REPORT.setdefault("proxy_exclude", {})[key] = {"triangles_dropped": _droppe
+d, "flagged_vertices": int(_pe.sum())}
+  scripts\assemble_own.py:1309:            cm_ = PB.proxy_from_mesh(z, _subs, int(tris or PBUD.get("items_default", 100)))
+  scripts\assemble_own.py:1310:        elif cm_ is not None and PBUD and tris:
+  scripts\assemble_own.py:1311:            cm_ = PB.reduce_proxy(cm_, int(tris))
+  scripts\assemble_own.py:1326:    # cfg suit_push_delta {"sets": "<npz: NEAR, BARE, BAND_PUSH_I, BAND_PUSH_RATIO>", "md5"
+: "<prefix>"} (garment-fit m21f3 alpha cut-out, explicit sets in own Body_ ids): the MAIN suit's push list comes from the
+  scripts\assemble_own.py:1327:    # clip data (push_lists.json["Bodysuit"], solved on the shells WITH the bare region hid
+den / pushed), not from the shell HIDE / PUSH arrays: drop EVERY entry of a NEAR vertex (bare region + hide border),
+> scripts\assemble_own.py:1328:    # add the D21 band pushes (visibility 1.0). The thin looks keep using their shell array
+s (same rule inside). Counts -> REPORT suit_push_delta.
+  scripts\assemble_own.py:1329:    _spd = CFG.get("suit_push_delta")
+  scripts\assemble_own.py:1330:    if _spd:
+  scripts\assemble_own.py:1331:        import hashlib as _hl
+  scripts\assemble_own.py:1334:            raise SystemExit(f"suit_push_delta: {_spd['sets']} md5 differs from the pinned
+{_spd['md5']}")
+  scripts\assemble_own.py:1335:        _cs = CF.collider("Bodysuit", drop=_sz["NEAR"], add=(_sz["BAND_PUSH_I"], _sz["BAND_
+PUSH_RATIO"], 1.0))
+> scripts\assemble_own.py:1336:        REPORT["suit_push_delta"] = dict((CF.report.get("finalize", {}).get("colliders", {}
+).get("Bodysuit", {}) or {}).get("delta") or {}, near=int(len(_sz["NEAR"])), band=int(len(_sz["BAND_PUSH_I"])))
+  scripts\assemble_own.py:1337:    else:
+  scripts\assemble_own.py:1338:        _cs = CF.collider("Bodysuit")
+  scripts\assemble_own.py:1339:    AC_SUIT = suit_v3_collider("Bodysuit", SUIT["smr"], SUIT["mesh"], SUIT["mats"], SUIT["V
+"], SUIT["bones"], SUIT["hide"],
+  scripts\assemble_own.py:1502:                    P.node(f"{holder}/{s}_ShoePad", world=_sm["pad"])
+  scripts\assemble_own.py:1503:                    P.node(f"{holder}/{s}_ShoeHeel", world=_sm["heel"])
+> scripts\assemble_own.py:1504:                    REPORT.setdefault("shoe_markers", {})[f"{it['item']}.{s}"] = {
+  scripts\assemble_own.py:1505:                        k_: (round(v_, 4) if isinstance(v_, float) else v_) for k_, v_ in _
+sm.items() if k_ not in ("pad", "heel")}
+  scripts\assemble_own.py:1506:                elif f"{s}_ShoePad" in FMT and f"{s}_ShoeHeel" in FMT:   # sim agent's veri
+fied shoe contacts (local to the holder)
+  scripts\assemble_own.py:1507:                    P.node(holder, world=W_rest[f"Foot.{s}_base"])
+  scripts\assemble_own.py:1525:            if not cdat:
+  scripts\assemble_own.py:1526:                acv.update({"m_pushDistance": -0.018, "m_forceHideList": ["Toe.L:0.05", "To
+e.R:0.05"]})
+> scripts\assemble_own.py:1527:            REPORT["shoes_collider"] = {"sole_y": round(sole_y, 4), "heel_height_m": round(
+float(W_rest["Foot.L_base"][1, 3] - sole_y), 4)}
+  scripts\assemble_own.py:1528:        fill_script(ac, "AdvancedCollider", acv)
+  scripts\assemble_own.py:1529:        AC_ITEMS.add(obj)
+  scripts\assemble_own.py:1530:        (FEATURE_AC if CF.on and _slot_of.get(obj) in NON_CLOTHING_SLOTS else OUT_AC).appen
+d(ac)
+  scripts\assemble_own.py:1617:             "Anus": float(np.linalg.norm(body["SHAPE__Anus"], axis=1).max())}
+  scripts\assemble_own.py:1618:keys_open.update({k: float(v) for k, v in holes.get("open_max_m", {}).items()})   # calibra
+ted by own_holes_v2 (game: 30 % x shaft r / openMax)
+> scripts\assemble_own.py:1619:REPORT["open_max_m"] = {k: round(v, 5) for k, v in keys_open.items()}
+> scripts\assemble_own.py:1620:REPORT["holes"] = {"Mouth": [np.round(p, 4).tolist() for p in mouth_pts], "Vagina": [np.rou
+nd(p, 4).tolist() for p in vag_pts],
+  scripts\assemble_own.py:1621:                   "Anus": [np.round(p, 4).tolist() for p in anus_pts], "open_max_m": keys_
+open,
+  scripts\assemble_own.py:1622:                   "throat_distance_m": float(np.linalg.norm(mouth_pts[0] - mouth_pts[2]))}
+  scripts\assemble_own.py:1623:
+  scripts\assemble_own.py:1721:    if _n in CPROP:
+  scripts\assemble_own.py:1722:        cc_specs[_n] = ("sphere" if "radius" in CPROP[_n]["fields"] else "capsule", _cpv(CP
+ROP[_n]["fields"]))
+> scripts\assemble_own.py:1723:REPORT["collider_proposal"] = sorted(CPROP) if CPROP else None
+  scripts\assemble_own.py:1724:# penis cloth colliders: shipped prefabs carry ClothColliders/penis1_CC..penis7_CC (capsule
+s, isGlobal 1, axis 2 = along the
+  scripts\assemble_own.py:1725:# shaft) listed in the cloth rig's `penis`; Penis.Init copies that list into m_bones/m_coll
+iders and Penis.UpdateBones moves
+  scripts\assemble_own.py:1726:# the capsules with the shaft bones every frame (= what other actors' mouth/vagina cloth co
+llides with). Without them
+  scripts\assemble_own.py:1749:                                                     "startRadius": r0, "endRadius": r1, "i
+sGlobal": 1})
+  scripts\assemble_own.py:1750:        PENIS_CC.append(f"penis{k + 1}_CC")
+> scripts\assemble_own.py:1751:    REPORT["penis_cloth_colliders"] = {n: {k: round(v, 4) for k, v in cc_specs[n][1].items(
+) if k != "center"} for n in PENIS_CC}
+  scripts\assemble_own.py:1752:# hair-only colliders (own_hair_colliders.py, references/23 section 8): children of the sta
+ndard slots (Rig.Init re-parents
+  scripts\assemble_own.py:1753:# the slot with its children), listed only by the hair cloths; the garments keep the tight
+standard set
+  scripts\assemble_own.py:1754:if CFG.get("hair_colliders"):
+  scripts\assemble_own.py:1756:        place(f"{R}/ClothColliders/{_hc['path']}", np.array(_hc["transform"]))
+  scripts\assemble_own.py:1757:        cc_specs[_hc["path"]] = ("sphere" if "radius" in _hc["fields"] else "capsule", _cpv
+(_hc["fields"]))
+> scripts\assemble_own.py:1758:    REPORT["hair_colliders"] = len(json.load(open(CFG["hair_colliders"])))
+  scripts\assemble_own.py:1759:CCP = {}
+  scripts\assemble_own.py:1760:for path, (kind, vals) in cc_specs.items():
+  scripts\assemble_own.py:1761:    cls = "MagicaCapsuleCollider" if kind == "capsule" else "MagicaSphereCollider"
+  scripts\assemble_own.py:1764:    CCP[path] = pid
+  scripts\assemble_own.py:1765:RIG_CC = reserve_script(f"{R}/ClothColliders", "Rig")
+> scripts\assemble_own.py:1766:REPORT["cloth_colliders"] = {k: {kk: (round(vv, 4) if isinstance(vv, float) else vv) for kk
+, vv in v[1].items() if kk != "center"}
+  scripts\assemble_own.py:1767:                             for k, v in cc_specs.items()}
+  scripts\assemble_own.py:1768:
+  scripts\assemble_own.py:1769:# =============================================================================== MagicaClo
+th (soft tissue / mouth / throat)
+  scripts\assemble_own.py:1836:            "virtualDeformer": pptr(vd)})
+  scripts\assemble_own.py:1837:        CLOTH_COMP[part] = (rd, vd, mc_)
+> scripts\assemble_own.py:1838:    REPORT["cloth_params"] = {p: "game profile M_" + p for p in cloth_out}
+  scripts\assemble_own.py:1839:
+  scripts\assemble_own.py:1840:# =============================================================================== MagicaBon
+eCloth (hair, jacket, sleeves, hems, weapon)
+  scripts\assemble_own.py:1841:# own_bonecloth.py (references/23): one MagicaBoneCloth per group of her Blender physics pr
+oxies; garment cloths go to
+  scripts\assemble_own.py:1842:# Girl.m_clothingCloths (moved/destroyed with outfits), hair never does.
+> scripts\assemble_own.py:1843:BC = {"garments": [], "report": None}
+  scripts\assemble_own.py:1844:if CFG.get("bonecloths"):
+  scripts\assemble_own.py:1845:    import own_bonecloth
+  scripts\assemble_own.py:1846:    BC_FILES = [os.path.join(CFG["bonecloth_dir"], f"{n}.json") for n in CFG["bonecloths"]]
+  scripts\assemble_own.py:1847:    BC = own_bonecloth.integrate(BC_FILES, P=P, w=w, root=R, bone_path=SPATH, collider_pid=
+CCP, pptr=pptr, defaults=DEF)
+> scripts\assemble_own.py:1848:    REPORT["bone_cloths"] = BC["report"]
+  scripts\assemble_own.py:1849:
+  scripts\assemble_own.py:1850:# =============================================================================== Colliders
+ / Body
+  scripts\assemble_own.py:1851:P.node(f"{R}/Colliders/Body")
+  scripts\assemble_own.py:1860:        vals_["m_boundClothVertIds"] = [p_[0] for p_ in _pairs]                # shipped: c
+ollision/patch pairs at the
+  scripts\assemble_own.py:1861:        vals_["m_boundColliderVertIds"] = [p_[1] for p_ in _pairs]             # same rest
+position (holes_v3 §2c)
+> scripts\assemble_own.py:1862:        REPORT.setdefault("patch_bound_pairs", {})[part_] = len(_pairs)
+  scripts\assemble_own.py:1863:    fill_script(rd_, "MagicaRenderDeformer", vals_)
+> scripts\assemble_own.py:1864:REPORT["patch_border_verts"] = {k: int(len(v)) for k, v in patch_border.items()}
+  scripts\assemble_own.py:1865:fill_script(AC_BODY, "AdvancedCollider", {"m_skinRD": pptr(SMR_BODY), "m_skinColRD": pptr(S
+MR_COL), "m_data": pptr(ACDO)})
+  scripts\assemble_own.py:1866:
+  scripts\assemble_own.py:1867:# =============================================================================== Colliders
+ for the model's other slots
+  scripts\assemble_own.py:1887:    else:
+  scripts\assemble_own.py:1888:        col = smr(f"{R}/Colliders/{slot}/{slot}", mp, mats, Vv, root="DEF-Head", bones_tr=b
+tr)
+> scripts\assemble_own.py:1889:        if PBUD:                                                    # not reduced (no rule
+for this slot): counted at full size in the report
+  scripts\assemble_own.py:1890:            PB_SLOTS[slot] = {"tris": int(sum(len(s_) for s_ in EXTRA_M[nm][1]["SUBS"])), "
+verts": int(len(Vv)), "display_verts": int(len(Vv))}
+  scripts\assemble_own.py:1891:    dobj = w.reserve("AdvancedCollider_DataObject")
+  scripts\assemble_own.py:1892:    d = w.default("AdvancedCollider_DataObject"); d.update({"m_Name": f"Collider_Data_{slot
+}", "m_reducedToFullIds": [], "m_bodyVertPushList": []})
+  scripts\assemble_own.py:1970:            continue
+  scripts\assemble_own.py:1971:        _tiny_ac(nm_t, L_t["smr"], L_t["z"], L_t["subs"], L_t["mats"], L_t["bones"], L_t["b
+n"], "DEF-Hips")
+> scripts\assemble_own.py:1972:    REPORT["tiny_wetness_colliders"] = sorted(TINY_DONE)
+  scripts\assemble_own.py:1973:if STRIPPED_WET:
+> scripts\assemble_own.py:1974:    REPORT["wet_keyword_stripped"] = sorted(set(STRIPPED_WET))
+  scripts\assemble_own.py:1975:if SAC_USED:
+> scripts\assemble_own.py:1976:    REPORT["suit_alpha_cut"] = SAC_USED
+  scripts\assemble_own.py:1977:if BONE_TRIM:
+> scripts\assemble_own.py:1978:    REPORT["bone_trim"] = TRIM_STATS                                # live dict: meshes cre
+ated after this point still count
+  scripts\assemble_own.py:1979:if PBUD:                                                            # numbers of the proxie
+s (every slot is baked every frame, hidden ones too)
+> scripts\assemble_own.py:1980:    REPORT["proxy_budget"] = PB.summarize(PB_SLOTS, PBUD)
+> scripts\assemble_own.py:1981:    REPORT["proxy_budget"]["no_collider"] = sorted(PB_NO_COLLIDER)
+  scripts\assemble_own.py:1982:    if PB_WET:
+> scripts\assemble_own.py:1983:        REPORT["proxy_wetness"] = PB_WET                              # per proxy submesh:
+display area, the proxy's area in the GAME formula (sum max(0.001, tri area)), ratio, wetness tile px of both, ok (ratio w
+ithin 25 % OR equal tile)
+> scripts\assemble_own.py:1984:        REPORT["proxy_wetness_summary"] = {"slots": len(PB_WET), "submeshes": sum(len(v_) f
+or v_ in PB_WET.values()),
+  scripts\assemble_own.py:1985:                                           "not_ok": [f"{s_}#{r_['sub']}" for s_, rows_ in
+PB_WET.items() for r_ in rows_ if not r_.get("ok", True)]}
+  scripts\assemble_own.py:1986:    if PB_GATED:
+> scripts\assemble_own.py:1987:        REPORT["proxy_budget"]["gate_driven"] = PB_GATED
+  scripts\assemble_own.py:1988:if STUBBED:
+> scripts\assemble_own.py:1989:    REPORT["probe_stub_hidden"] = sorted(STUBBED)                    # measurement build: t
+hese display meshes are 3-vertex stubs (NOT shippable)
+> scripts\assemble_own.py:1990:    print("proxy budget:", {k_: v_ for k_, v_ in REPORT["proxy_budget"].items() if k_ != "p
+er_slot" and k_ != "gate"}, flush=True)
+  scripts\assemble_own.py:1991:# =============================================================================== futa hidd
+en under crotch-covering garments
+  scripts\assemble_own.py:1992:FUTA_HIDE = bool(CFG.get("futa_hide_by_garments"))
+  scripts\assemble_own.py:1993:_CROTCH = np.nonzero(np.isin(body["REGION"], ["Vagina"]))[0]
+  scripts\assemble_own.py:2012:
+  scripts\assemble_own.py:2013:
+> scripts\assemble_own.py:2014:REPORT["futa_hide"] = {} if FUTA_HIDE else None
+  scripts\assemble_own.py:2015:
+  scripts\assemble_own.py:2016:
+  scripts\assemble_own.py:2017:# =============================================================================== clips
+  scripts\assemble_own.py:2054:fp = json.load(open(CFG.get("face_pose_json") or os.path.join(OWN, "face_pose_sim.json")))
+  # cfg face_pose_json: face_v2 §1
+  scripts\assemble_own.py:2055:s_sim = fp["scale"]
+> scripts\assemble_own.py:2056:st2 = json.load(open(CFG["stage2_report"]))["similarity"]
+  scripts\assemble_own.py:2057:tu = C_B2U @ np.array(st2["translation"])
+  scripts\assemble_own.py:2058:frames = sorted(int(k) for k in fp["frames"])
+  scripts\assemble_own.py:2059:def native(M):
+  scripts\assemble_own.py:2064:face_bones = [b for b in fp["frames"]["0"] if b in SPATH]
+  scripts\assemble_own.py:2065:rest_err = max(float(np.linalg.norm(fw[0][b][:3, 3] - pos(b))) for b in face_bones)
+> scripts\assemble_own.py:2066:REPORT["checks"]["face_pose_frame0_vs_skeleton_mm"] = round(rest_err * 1000, 4)
+  scripts\assemble_own.py:2067:pc, rc, sc_ = [], [], []
+  scripts\assemble_own.py:2068:moving = 0
+  scripts\assemble_own.py:2069:for b in face_bones:
+  scripts\assemble_own.py:2086:    pc.append({"curve": curve(keys_p), "path": rel(b)}); rc.append({"curve": curve(keys_r),
+ "path": rel(b)})
+  scripts\assemble_own.py:2087:    sc_.append({"curve": curve(keys_s), "path": rel(b)})
+> scripts\assemble_own.py:2088:REPORT["checks"]["face_pose_bones"] = len(face_bones); REPORT["checks"]["face_pose_moving_b
+ones"] = moving
+  scripts\assemble_own.py:2089:face_flt = []
+  scripts\assemble_own.py:2090:sf = fp.get("shape_frames") or {}
+  scripts\assemble_own.py:2091:if sf and FACE_KEYS:
+  scripts\assemble_own.py:2104:            c_ = shape_curve(f"FBX/{ex['name']}", obj, k)
+  scripts\assemble_own.py:2105:            if c_: face_flt.append(c_)
+> scripts\assemble_own.py:2106:    REPORT["checks"]["face_pose_shape_curves"] = len(face_flt)
+  scripts\assemble_own.py:2107:CLIP_FACE = clip("Face_Pose", pc, rc, sc_, flt_c=face_flt)
+  scripts\assemble_own.py:2108:CLIP_RIG = clip("Face_Rigging", [{"curve": curve([key3(0.0, (0, 0, 0)), key3(frames[-1] / 6
+0.0, (0, 0, 0))]), "path": "Face"}])
+  scripts\assemble_own.py:2109:tp = [{"curve": curve([key3(0.0, P.nodes[SPATH[b]].pos)]), "path": rel(b)} for b in T if T[
+b]["kind"] == "source"]
+  scripts\assemble_own.py:2136:        w.fill(pid_, t_)
+  scripts\assemble_own.py:2137:        CLIPS.append(pid_)
+> scripts\assemble_own.py:2138:    REPORT["face_control_clips"] = len(json.load(open(FCC))["clips"]) - 1
+  scripts\assemble_own.py:2139:if SUIT and SUITV3:                                               # frame 0 = suit, 1 = off
+, 2.. = looks (+ endoskeleton)
+  scripts\assemble_own.py:2140:    def _fc(path, vals, attribute="m_IsActive", class_id=1):
+  scripts\assemble_own.py:2141:        vals = list(vals) + ([list(vals)[1]] if _STRIP else [])     # strip-safe: one more
+step = frame 1 (off) at the END
+  scripts\assemble_own.py:2161:        _c = [p_ for p_ in (f"FBX/{nm_}", f"FBX/{CFG['display_name']}_{nm_}", f"FBX/{nm_.sp
+lit('_', 1)[-1]}") if f"{R}/{p_}" in P.nodes]
+  scripts\assemble_own.py:2162:        if not _c:                                                  # never break a build o
+ver a look fix: warn and skip
+> scripts\assemble_own.py:2163:            REPORT.setdefault("warnings", []).append(f"suit_endo_hide_renderers: no FBX nod
+e for {nm_}"); continue
+  scripts\assemble_own.py:2164:        _cv.append(_fc(_c[0], [0 if x else 1 for x in _endo_on], "m_Enabled", 137))
+> scripts\assemble_own.py:2165:        REPORT.setdefault("suit_endo_hide_renderers", []).append(_c[0])
+  scripts\assemble_own.py:2166:    _worn = [1, 0] + [1] * _nl                                     # a suit or a look is on
+  scripts\assemble_own.py:2167:    if FUTA_HIDE and covers_crotch("Bodysuit", SUIT["hide"]):
+  scripts\assemble_own.py:2168:        _cv.append(_fc("Penis", [0 if x else 1 for x in _worn]))
+> scripts\assemble_own.py:2169:        REPORT["futa_hide"]["Customize_Bodysuit"] = [0 if x else 1 for x in _worn]
+  scripts\assemble_own.py:2170:        if CFG.get("futa_hide_holes") and "Bodysuit" not in CFG.get("holes_cover_exclude",
+[]):
+  scripts\assemble_own.py:2171:            _cv += [_fc("Holes/Vagina", [0 if x else 1 for x in _worn]), _fc("Holes/Anus",
+[0 if x else 1 for x in _worn])]
+  scripts\assemble_own.py:2172:    CLIPS.append(clip("Customize_Bodysuit", flt_c=_cv))
+  scripts\assemble_own.py:2175:    if FUTA_HIDE and covers_crotch("Bodysuit", SUIT["hide"]):
+  scripts\assemble_own.py:2176:        _suit_curves.append(flt("Penis", 0.0, 1.0))                # suit on (frame 0) hide
+s the futa, off shows it (shipped rule)
+> scripts\assemble_own.py:2177:        REPORT["futa_hide"]["Customize_Bodysuit"] = [0.0, 1.0]
+  scripts\assemble_own.py:2178:        if CFG.get("futa_hide_holes") and "Bodysuit" not in CFG.get("holes_cover_exclude",
+[]):
+  scripts\assemble_own.py:2179:            _suit_curves += [flt("Holes/Vagina", 0.0, 1.0), flt("Holes/Anus", 0.0, 1.0)]
+# shipped: covers key the holes too
+> scripts\assemble_own.py:2180:            REPORT["futa_hide"]["Customize_Bodysuit_holes"] = [0.0, 1.0]
+  scripts\assemble_own.py:2181:    CLIPS.append(clip("Customize_Bodysuit", flt_c=_suit_curves))
+  scripts\assemble_own.py:2182:LAYER_CLIPS = {}
+  scripts\assemble_own.py:2183:for _ln in ("Stockings", "Pubes"):                                # skin layers: frame 0 =
+off, 1 = on
+  scripts\assemble_own.py:2210:                for k_, w_ in _hk.items():
+  scripts\assemble_own.py:2211:                    o["body_keys"][k_] = max(w_, o["body_keys"].get(k_, 0.0))
+> scripts\assemble_own.py:2212:            REPORT["body_hold_in_outfit_clips"] = {k_: round(w_ * 100.0, 1) for k_, w_ in _
+hk.items()}
+  scripts\assemble_own.py:2213:        _G = {}                                                      # garment-only keys mo
+ved to Body_ (cfg garment_only_keys_on_body): key -> weight per option (max over the sources)
+> scripts\assemble_own.py:2214:        _gconf = REPORT.setdefault("garment_only_keys_on_body", {}).setdefault("conflicts",
+ [])
+  scripts\assemble_own.py:2215:
+  scripts\assemble_own.py:2216:        def _gcurve(path, key, vals):
+  scripts\assemble_own.py:2217:            """one garment-only key curve: on Body_ (merged) when the key got a zero Body_
+shape, else on the item / suit path as before"""
+  scripts\assemble_own.py:2243:                _pv = [0.0 if any(_cov.get(ob) and ob in o["visible"] for ob in _cov) else
+1.0 for o in opts]
+  scripts\assemble_own.py:2244:                curves_.append(fcurve("Penis", _pv))
+> scripts\assemble_own.py:2245:                REPORT["futa_hide"][f"Customize_{sl['slot']}"] = {"penis_active": _pv, "cov
+ering": sorted(k for k, v in _cov.items() if v)}
+  scripts\assemble_own.py:2246:                # refs 13 S7 (shipped, 143 bundles): crotch covers also key Holes/Vagina +
+Holes/Anus m_IsActive (worn 0, off 1).
+  scripts\assemble_own.py:2247:                # Girl.RefreshCustomization samples every Customize clip and ANDs Penis/Vag
+ina/Anus activeSelf (any clip
+  scripts\assemble_own.py:2248:                # with 0 wins) -> order-independent; interactions that need a hole request
+it (m_requiredCustomizations).
+  scripts\assemble_own.py:2252:                        _hv = [0.0 if any(ob in o["visible"] for ob in _hc) else 1.0 for o
+in opts]
+  scripts\assemble_own.py:2253:                        curves_ += [fcurve("Holes/Vagina", _hv), fcurve("Holes/Anus", _hv)]
+> scripts\assemble_own.py:2254:                        REPORT["futa_hide"][f"Customize_{sl['slot']}"]["holes_active"] = _h
+v
+  scripts\assemble_own.py:2255:        if CF.on:                                                   # clip fix: D13 cross-s
+lot item keys + suit SuitFit_* keys
+  scripts\assemble_own.py:2256:            for slot_, ob, k, vals in CF.cross_slot_item_curves(OUTFIT):
+  scripts\assemble_own.py:2257:                it_ = OUT_ITEMS.get(ob)
+  scripts\assemble_own.py:2272:            curves_.append(fcurve("FBX/Body_", [v * 100.0 for v in _G[_k]], f"blendShape.{_
+k}", 137))
+  scripts\assemble_own.py:2273:        if _G:
+> scripts\assemble_own.py:2274:            REPORT["garment_only_keys_on_body"].setdefault("curves_on_Body_", {})[sl["slot"
+]] = len(_G)
+  scripts\assemble_own.py:2275:        if curves_:
+  scripts\assemble_own.py:2276:            SLOT_CLIP[sl["slot"]] = clip(f"Customize_{sl['slot']}", flt_c=curves_)
+  scripts\assemble_own.py:2277:            CLIPS.append(SLOT_CLIP[sl["slot"]])
+> scripts\assemble_own.py:2278:    REPORT["outfit_clips"] = [c for c in REPORT.get("outfit_clips", [])] + [f"Customize_{sl
+['slot']}" for sl in OUTFIT["slots"]]
+  scripts\assemble_own.py:2279:ANIM = P.component(R, "Animation")
+  scripts\assemble_own.py:2280:an = w.default("Animation")
+  scripts\assemble_own.py:2281:an.update({"m_Enabled": True, "m_Animation": pptr(CLIP_TPOSE), "m_Animations": [pptr(c) for
+ c in CLIPS], "m_WrapMode": 0,
+  scripts\assemble_own.py:2361:    fb["L" if wname.startswith("L_") else "R"].append(pptr(P.tr(wpath)))
+  scripts\assemble_own.py:2362:rig_vals["faceBonesL"], rig_vals["faceBonesR"], rig_vals["faceBonesM"] = fb["L"], fb["R"],
+fb["M"]
+> scripts\assemble_own.py:2363:REPORT["rig_face_lists"] = {k: len(v) for k, v in rig_vals.items() if k in FACE_LISTS or k.
+startswith("faceBones")}
+  scripts\assemble_own.py:2364:fill_script(RIG, "Rig", rig_vals)
+  scripts\assemble_own.py:2365:pup_slots = {"hips": "Hips", "spine": "Spine", "chest": "Chest", "neck": "Chest/Neck", "hea
+d": "Head",
+  scripts\assemble_own.py:2366:             "lUpperArm": "UpperArm_L", "lForearm": "Forearm_L", "lHand": "Hand_L", "rUpper
+Arm": "UpperArm_R",
+  scripts\assemble_own.py:2469:        # clip-fix masks keyed in them stay behind on a swap (clip-fix agent 2026-10-19); o
+nly Hair stays non-clothing
+  scripts\assemble_own.py:2470:        gv["m_nonClothingAnims"] = [pptr(SLOT_CLIP[s]) for s in CFG.get("crosswear_keep_slo
+ts", ["Hair"]) if s in SLOT_CLIP]
+> scripts\assemble_own.py:2471:    REPORT["crosswear_extra_clothing_names"] = gv["m_extraClothingNames"]
+  scripts\assemble_own.py:2472:if BC.get("garments"):
+  scripts\assemble_own.py:2473:    gv["m_clothingCloths"] = [pptr(p_) for p_ in BC["garments"]]      # B_Jacket, B_Sleeves
+, B_Pants, B_Harness
+  scripts\assemble_own.py:2474:# =============================================================================== voice (ow
+n_voice.py, references/24)
+  scripts\assemble_own.py:2484:        VOICE = own_voice.attach(w, _vdir)
+  scripts\assemble_own.py:2485:        gv.update({"m_voiceLines": VOICE["m_voiceLines"], "m_music": VOICE["m_music"], "m_m
+usicVolume": VOICE["m_musicVolume"]})
+> scripts\assemble_own.py:2486:        REPORT["voice"] = {"lines": len(VOICE["m_voiceLines"]), "music": bool(VOICE["m_musi
+c"]["m_PathID"]), "names": VOICE["names"]}
+  scripts\assemble_own.py:2487:fill_script(GIRL, "Girl", gv)
+  scripts\assemble_own.py:2488:if CF.on or XW is not None:                                        # gate (False = do not i
+nstall): push ids fit the body map
+> scripts\assemble_own.py:2489:    REPORT["checks"]["push_ids_fit_body_map"] = bool(CF.ids_ok() and all(
+  scripts\assemble_own.py:2490:        e["vertId"] < ((len(XW["map"]) if CFG.get("hidefix") else 28915) if XW is not None
+else len(V)) for lst in XW_WRITTEN for e in lst))
+  scripts\assemble_own.py:2491:
+  scripts\assemble_own.py:2492:# =============================================================================== save
+  scripts\assemble_own.py:2502:    if _rel in ("Penis/B", "Penis/C", "Penis/C/D"):
+  scripts\assemble_own.py:2503:        _n.layer = LAYER_RAGDOLL
+> scripts\assemble_own.py:2504:REPORT["tags_layers"] = {"advanced_collider_tagged": sum(1 for n in P.nodes.values() if n.t
+ag == TAG_ADVANCED_COLLIDER)}
+  scripts\assemble_own.py:2505:P.finish()
+  scripts\assemble_own.py:2506:w.set_main(P.go(R))
+  scripts\assemble_own.py:2507:if CFG.get("prune_orphans"):
+  scripts\assemble_own.py:2508:    # objects no PPtr chain from the container prefab reaches stay resident in the preload
+table (the game loads the whole bundle): m21p2b had 22 (duplicate Shion_Bodysuit material + 4 textures 34.7 MB + 17 plain-
+fit
+> scripts\assemble_own.py:2509:    # twin meshes 3.6 MB). "report" = list them; "drop" = remove them (cfg prune_orphans_ke
+ep = name regexes that stay, e.g. the twins TfaFit may need: research R18)
+  scripts\assemble_own.py:2510:    _orph = w.orphans()
+  scripts\assemble_own.py:2511:    _keep_rx = __import__("re").compile("|".join(CFG.get("prune_orphans_keep") or ["$^"]))
+  scripts\assemble_own.py:2512:    _drop = [p_ for p_ in _orph if not _keep_rx.search(str(w.names.get(p_) or ""))]
+  scripts\assemble_own.py:2514:    for p_ in _orph:
+  scripts\assemble_own.py:2515:        _by.setdefault(w.kinds.get(p_, "?"), []).append(str(w.names.get(p_)))
+> scripts\assemble_own.py:2516:    REPORT["orphans"] = {"mode": CFG["prune_orphans"], "count": len(_orph), "by_type": {k_:
+ len(v_) for k_, v_ in _by.items()}, "names": {k_: sorted(v_)[:40] for k_, v_ in _by.items()},
+  scripts\assemble_own.py:2517:                         "dropped": len(_drop) if CFG["prune_orphans"] == "drop" else 0}
+> scripts\assemble_own.py:2518:    print("orphans:", REPORT["orphans"]["count"], REPORT["orphans"]["by_type"], flush=True)
+  scripts\assemble_own.py:2519:    if CFG["prune_orphans"] == "drop":
+  scripts\assemble_own.py:2520:        w.drop(_drop)
+  scripts\assemble_own.py:2521:out = CFG["out_tfa"]
+  scripts\assemble_own.py:2529:gc.collect()
+  scripts\assemble_own.py:2530:info = w.save(out)
+> scripts\assemble_own.py:2531:REPORT["bundle"] = info
+  scripts\assemble_own.py:2532:if SR.on:
+> scripts\assemble_own.py:2533:    REPORT["skin_repair"] = SR.report
+> scripts\assemble_own.py:2534:json.dump(REPORT, open(CFG.get("report_path") or os.path.join(OWN, "assemble_report.json"),
+ "w"), indent=1, default=str)
+> scripts\assemble_own.py:2535:print(json.dumps({k: REPORT[k] for k in ("checks", "patches", "bundle")}, indent=1, default
+=str))
 
 
 PS D:\TFA\tfa-character-import-toolsets_v1.2\tfa-character-import-toolsets>
